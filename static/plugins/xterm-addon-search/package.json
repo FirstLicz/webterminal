@@ -1,0 +1,55 @@
+{
+  "_from": "xterm-addon-search",
+  "_id": "xterm-addon-search@0.8.1",
+  "_inBundle": false,
+  "_integrity": "sha512-OtOaC9gxD2Q4ZnjZrCSRZmKLwwUjXX3gP7mIzq8Rs50317DGRDqgTLuHTYv/Nx/LvI5ceVFRYCxK36Ixs1nXNw==",
+  "_location": "/xterm-addon-search",
+  "_phantomChildren": {},
+  "_requested": {
+    "type": "tag",
+    "registry": true,
+    "raw": "xterm-addon-search",
+    "name": "xterm-addon-search",
+    "escapedName": "xterm-addon-search",
+    "rawSpec": "",
+    "saveSpec": null,
+    "fetchSpec": "latest"
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
+  ],
+  "_resolved": "https://registry.npmjs.org/xterm-addon-search/-/xterm-addon-search-0.8.1.tgz",
+  "_shasum": "dfc557e9bcf5fd8ed96292c0d271aa865bc545d5",
+  "_spec": "xterm-addon-search",
+  "_where": "F:\\bwd_workspace\\gitspace\\WebTerminal",
+  "author": {
+    "name": "The xterm.js authors",
+    "url": "https://xtermjs.org/"
+  },
+  "bugs": {
+    "url": "https://github.com/xtermjs/xterm.js/issues"
+  },
+  "bundleDependencies": false,
+  "deprecated": false,
+  "description": "An addon for [xterm.js](https://github.com/xtermjs/xterm.js) that enables searching the buffer. This addon requires xterm.js v4+.",
+  "homepage": "https://github.com/xtermjs/xterm.js#readme",
+  "license": "MIT",
+  "main": "lib/xterm-addon-search.js",
+  "name": "xterm-addon-search",
+  "peerDependencies": {
+    "xterm": "^4.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xtermjs/xterm.js.git"
+  },
+  "scripts": {
+    "build": "../../node_modules/.bin/tsc -p .",
+    "package": "../../node_modules/.bin/webpack",
+    "prepackage": "npm run build",
+    "prepublishOnly": "npm run package"
+  },
+  "types": "typings/xterm-addon-search.d.ts",
+  "version": "0.8.1"
+}
