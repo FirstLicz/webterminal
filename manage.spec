@@ -5,7 +5,7 @@ block_cipher = None
 
 
 a = Analysis(['manage.py'],
-             pathex=['F:\\bwd_workspace\\gitspace\\WebTerminal'],
+             pathex=['F:\\bwd_workspace\\gitspace\\github\\personal\\webterminal'],
              binaries=[],
              datas=[],
              hiddenimports=[],

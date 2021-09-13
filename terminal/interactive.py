@@ -6,8 +6,14 @@ import sys
 from paramiko.py3compat import u
 from datetime import datetime, timedelta
 from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
 from paramiko.channel import Channel
 from queue import Queue
+import redis
+import json
+import time
+import platform
 
 try:
     import select
@@ -36,19 +42,22 @@ class ShellHandler:
         self.ssh.close()
 
     def windows_shell(self):
-
-        writer = InteractiveThread(channel=self.channel, channel_name=self.channel_name)
-        writer.start()
-
-        try:
-            while True:
-                d = self.channel.recv(1024)
-                if not d:
-                    break
-                self.channel.send(d)
-        except EOFError:
-            # user hit ^Z or F6
-            pass
+        logger.info(f"channel = {self.channel}")
+        write = SubscribeWriteThread(channel=self.channel, channel_name=self.channel_name)
+        write.start()
+        display = InteractiveThread(channel=self.channel, channel_name=self.channel_name)
+        display.start()
+        # 接收前端页面输入内容，发送到 shell
+        # try:
+        #     while True:
+        #         d = self.channel.recv(1024)
+        #         print(f"d = {d}")
+        #         if not d:
+        #             break
+        #         self.channel.send(d)
+        # except EOFError:
+        #     # user hit ^Z or F6
+        #     pass
 
     def posix_shell(self):
         try:
@@ -106,15 +115,49 @@ class InteractiveThread(threading.Thread):
             logger.info(f"recv data = {data}")
             if not data:
                 break
-            websocket_channel.send(self.channel_name, {"stdout": data})
+            if platform.system().lower() == "windows":
+                sys.stdout.flush()
+            async_to_sync(websocket_channel.send)(self.channel_name, {
+                "type": "terminal_message",
+                "message": data
+            })
 
 
-class SubscribeThread(threading.Thread):
+class SubscribeWriteThread(threading.Thread):
 
-    def __init__(self, read_queue: Queue = None, write_queue: Queue = None):
-        super(SubscribeThread, self).__init__()
-        self.read_queue = read_queue
-        self.write_queue = write_queue
+    def __init__(self, channel_name: str = None, channel: Channel = None):
+        super(SubscribeWriteThread, self).__init__()
+        self.channel_name = channel_name
+        self.channel = channel
+        self.__control = threading.Event()
+        self.__control.set()
+        # 建立 redis 订阅机制, 先有订阅，才能发送
+        redis_instance = redis.Redis(host="127.0.0.1")
+        self.pubsub = redis_instance.pubsub()
+        self.pubsub.subscribe(self.channel_name)
+
+    def stop(self):
+        self.__control.clear()
+
+    def run(self) -> None:
+        while self.__control.isSet():
+            result = self.pubsub.get_message()
+            if result:
+                logger.debug(f"result = {result}, type = {type(result)}")
+                data = result.get("data")
+                if isinstance(data, str):
+                    if platform.system().lower() == "windows":
+                        if data == "\\r":
+                            data = "\\r\\n"
+                    self.channel.send(data)
+                elif isinstance(data, bytes):
+                    if platform.system().lower() == "windows":
+                        if data == "\\r":
+                            data = "\\r\\n"
+                    self.channel.send(data.decode())
+                # self.pubsub.publish(self.channel_name, json.dumps({"message": "test"}))
+
+            time.sleep(0.001)
 
 
 if __name__ == '__main__':

@@ -7,50 +7,60 @@
     <script src="{% static 'plugins/xterm/lib/xterm.js' %}"></script>
     <script src="{% static 'plugins/xterm-addon-attach/lib/xterm-addon-attach.js' %}"></script>
     <script src="{% static 'plugins/xterm-addon-fit/lib/xterm-addon-fit.js' %}"></script>
+    <script src="{% static 'plugins/jQuery/jquery-2.2.3.min.js' %}"></script>
 </head>
 <body>
 <div id="terminal"></div>
 <script>
-    var term = new Terminal({
-        // cursorStyle: 'underline', //光标样式
-        cursorBlink: true, // 光标闪烁
-        convertEol: true, //启用时，光标将设置为下一行的开头
-        disableStdin: false, //是否应禁用输入。
-        theme: {
-            foreground: 'white', //字体
-            background: '#060101', //背景色
-            cursor: 'help',//设置光标
+    $(function () {
+        var term = new Terminal({
+            // cursorStyle: 'underline', //光标样式
+            cursorBlink: true, // 光标闪烁
+            convertEol: true, //启用时，光标将设置为下一行的开头
+            disableStdin: false, //是否应禁用输入。
+            theme: {
+                foreground: 'yellow', //字体
+                background: '#060101', //背景色
+                cursor: 'help',//设置光标
+            }
+        });
+        var terminal = document.getElementById('terminal');
+        // 初始化
+        term._initialized = true;
+        // 创建 websocket
+        var url = "ws://127.0.0.1:8000/ws/terminal/{{ session_id }}/"
+        var ws = new WebSocket(url);
+        var fitAddon = new FitAddon.FitAddon()
+        var attachAddon = new AttachAddon.AttachAddon(ws)
+        term.loadAddon(attachAddon)
+        term.loadAddon(fitAddon)/**/
+        term.open(terminal);
+        term.focus()
+        window.onresize = function () { // 窗口尺寸变化时，终端尺寸自适应
+            fitAddon.fit()
+        }
+        var terminal_height = terminal.offsetHeight;
+        var terminal_width = terminal.offsetWidth;
+        console.log("height = " + terminal_height)
+        console.log("width = " + terminal_width)
+
+        // term.write('Hello from \x1B[1;3;31mxterm.js\x1B[0m $ ')
+        ws.onopen = function () {
+            // 当 websocket 创建成功时，触发事件
+            console.log("open websocket")
+            ws.send(JSON.stringify(["ip", terminal_width, terminal_height])); // 将消息发出
+        }
+        ws.onmessage = function (event) {
+            console.log(event.data)
+        }
+        ws.onclose = function (event) {
+            console.log(event)
+        }
+        ws.onerror = function (event) {
+            console.log(event)
         }
     });
-    var terminal = document.getElementById('terminal');
-    term.open(terminal);
-    var terminal_height = terminal.offsetHeight;
-    var terminal_width = terminal.offsetWidth;
 
-
-    console.log("height = " + terminal_height)
-    console.log("width = " + terminal_width)
-    // term.write('Hello from \x1B[1;3;31mxterm.js\x1B[0m $ ')
-    var url = "ws://127.0.0.1:8000/ws/terminal/{{ session_id }}/"
-    var ws = new WebSocket(url);
-    ws.onopen = function () {
-        // 当 websocket 创建成功时，触发事件
-        console.log("open websocket")
-        ws.send(JSON.stringify(["ip", "800", "600"])); // 将消息发出
-        const attachAddon = new AttachAddon(ws);
-        const fitAddon = new FitAddon();
-        term.loadAddon(attachAddon);
-        term.loadAddon(fitAddon);
-    }
-    ws.onmessage = function (event) {
-        console.log(event)
-    }
-    ws.onclose = function (event) {
-        console.log(event)
-    }
-    ws.onerror = function (event) {
-        console.log(event)
-    }
 </script>
 </body>
 </html>

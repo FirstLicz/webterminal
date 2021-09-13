@@ -24,7 +24,7 @@ class ShellHandler:
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            self.ssh.connect(hostname="192.168.1.83", username="root", password="bwda123!@#", port=22)
+            self.ssh.connect(hostname="192.168.1.82", username="root", password="bwda123!@#", port=22)
         except socket.timeout:
             print(f"connect 192.168.1.83 failed")
         if channel:
@@ -110,9 +110,9 @@ class InteractiveThread(threading.Thread):
             data = u(data)
             if not data:
                 break
-            # sys.stdout.write(data)
-            # sys.stdout.flush()
-            self.read_queue.put(data)
+            sys.stdout.write(data)
+            sys.stdout.flush()
+            # self.read_queue.put(data)
 
 
 class SshTerminalWriteThread(threading.Thread):
@@ -132,7 +132,6 @@ class SshTerminalWriteThread(threading.Thread):
                 if not d:
                     break
                 self.channel.send(d)
-                print(f"{d}")
         except EOFError:
             # user hit ^Z or F6
             pass

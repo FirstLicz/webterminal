@@ -20,6 +20,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # 设置环境路径
 sys.path.append(BASE_DIR)
 
+# build binary file
+GDAL_LIBRARY_PATH = r'C:\OSGeo4W64\bin'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
@@ -207,3 +209,15 @@ LOGGING = {
         },
     },
 }
+
+# 缓存配置
+# CACHES = {
+#     "default": {
+#         "BACKEND": "django_redis.cache.RedisCache",
+#         "LOCATION": "redis://127.0.0.1:6379/1",
+#         "OPTIONS": {
+#             "CONNECTION_POOL_KWARGS": {"max_connections": 20},
+#             "PASSWORD": "password"
+#         }
+#     }
+# }

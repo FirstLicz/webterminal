@@ -94,4 +94,6 @@ if __name__ == '__main__':
     # redis_unsubscribe()
     # print(f"注销")
     # time.sleep(1000)
-    worker()
+    # worker()
+    import platform
+    print(platform.system())
