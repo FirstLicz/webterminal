@@ -9,7 +9,7 @@
     <script src="{% static 'plugins/xterm-addon-fit/lib/xterm-addon-fit.js' %}"></script>
     <script src="{% static 'plugins/jQuery/jquery-2.2.3.min.js' %}"></script>
 </head>
-<body>
+<body style="margin: 0">
 <div id="terminal"></div>
 <script>
     $(function () {
@@ -29,7 +29,7 @@
         var terminal = document.getElementById('terminal');
         console.log("height = " + window.innerHeight)
         console.log("width = " + window.innerWidth)
-        term.resize(parseInt(window.innerWidth / 9), parseInt(window.innerHeight / 20))
+        term.resize(parseInt(window.innerWidth / 9) - 1, parseInt(window.innerHeight / 17) - 1)
         // 初始化
         term._initialized = true;
         // 创建 websocket
