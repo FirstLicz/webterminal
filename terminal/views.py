@@ -16,6 +16,13 @@ class WebSshTwoView(View):
         })
 
 
+class TerminalPlayView(View):
+
+    def get(self, request):
+        video_path = "/media/" + "SSH2/specific.59919a870b3049929863120073d7b143!75fe9ee2079444128f56470f93b62f92"
+        return render(request, "terminal/terminal_play.html", locals())
+
+
 class GuacamoleView(View):
 
     def get(self, request):

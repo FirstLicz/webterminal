@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% load static %}
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="{% static 'plugins/asciinema-player/css/asciinema-player.css' %}" />
+    <title>Title</title>
+</head>
+<body>
+    <asciinema-player src="{{ video_path }}"></asciinema-player>
+    <script src="{% static 'plugins/asciinema-player/js/asciinema-player.js' %}"></script>
+</body>
+</html>
