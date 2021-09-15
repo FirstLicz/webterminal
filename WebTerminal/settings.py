@@ -130,6 +130,12 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
+# media 媒体文件管理
+MEDIA_URL = '/media/'
+MEDIA_ROOT = Path(BASE_DIR, "media").as_posix()
+if not os.path.isdir(MEDIA_ROOT):
+    os.makedirs(MEDIA_ROOT, exist_ok=True)
+
 # static root 目录，用于生产 nginx 代理
 if DEBUG:
     STATICFILES_DIRS = [

@@ -7,6 +7,8 @@ from paramiko.py3compat import u
 from datetime import datetime, timedelta
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+import os
+from django.conf import settings
 
 from paramiko.channel import Channel
 from queue import Queue
@@ -25,7 +27,7 @@ logger = logging.getLogger("default")
 
 class ShellHandler:
 
-    def __init__(self, channel: Channel = None, width=800, height=600, channel_name=None):
+    def __init__(self, channel: Channel = None, width=800, height=600, channel_name=None, extra_params: dict = None):
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
@@ -37,6 +39,7 @@ class ShellHandler:
         else:
             self.channel = self.ssh.invoke_shell(width=width, height=height)
         self.channel_name = channel_name
+        self.extra_params = extra_params
 
     def __del__(self):
         self.ssh.close()
@@ -45,7 +48,9 @@ class ShellHandler:
         logger.info(f"channel = {self.channel}")
         write = SubscribeWriteThread(channel=self.channel, channel_name=self.channel_name)
         write.start()
-        display = InteractiveThread(channel=self.channel, channel_name=self.channel_name)
+        self.extra_params["thread_ssh2_write"] = write
+        display = InteractiveThread(channel=self.channel, channel_name=self.channel_name,
+                                    extra_params=self.extra_params)
         display.start()
         # 接收前端页面输入内容，发送到 shell
         # try:
@@ -87,7 +92,7 @@ class ShellHandler:
 
 class InteractiveThread(threading.Thread):
 
-    def __init__(self, channel: Channel = None, channel_name=None):
+    def __init__(self, channel: Channel = None, channel_name=None, extra_params: dict = None):
         super(InteractiveThread, self).__init__()
         self.__control = threading.Event()  # 暂停控制标识
         self.__run_control = threading.Event()  # 停止控制
@@ -95,6 +100,7 @@ class InteractiveThread(threading.Thread):
         self.__run_control.set()
         self.channel = channel
         self.channel_name = channel_name
+        self.extra_params = extra_params
 
     def pause(self):
         self.__control.clear()  # 设置为False, 让现场阻塞
@@ -108,24 +114,63 @@ class InteractiveThread(threading.Thread):
 
     def run(self) -> None:
         websocket_channel = get_channel_layer()
-        while self.__run_control.isSet():
-            self.__control.wait()  # 为True时立即返回，为False时阻塞直到内部设置为True返回
-            data = self.channel.recv(1024)
-            data = u(data)
-            logger.info(f"recv data = {data}")
-            if not data:
-                break
-            if platform.system().lower() == "windows":
-                sys.stdout.flush()
-            async_to_sync(websocket_channel.send)(self.channel_name, {
-                "type": "terminal_message",
-                "message": data
-            })
+        begin_time = time.time()
+        last_time = begin_time
+        ssh_obj = self.extra_params.get("ssh")
+        thread_ssh2_write = self.extra_params.get("thread_ssh2_write", None)
+        # 记录文件日志, 使用version 2 版本，优化 顺序写文件，防止文件过大，吃内存
+        first_line = {"version": 2, "width": self.extra_params.get("width"), "height": self.extra_params.get("height"),
+                      "timestamp": round(begin_time), "title": "",
+                      "env": {"TERM": "xterm-256color", "SHELL": "/bin/bash"}}
+        target_dir = os.path.join(settings.MEDIA_ROOT, "SSH2")
+        if not os.path.isdir(target_dir):
+            os.makedirs(target_dir)
+        target_file = os.path.join(target_dir, self.channel_name)
+        f = open(target_file, 'w', encoding="utf8")
+        try:
+            f.writelines([json.dumps(first_line), '\n'])
+            while self.__run_control.isSet():
+                self.__control.wait()  # 为True时立即返回，为False时阻塞直到内部设置为True返回
+                data = self.channel.recv(1024)
+                data = u(data)
+                logger.info(f"recv data = {data}")
+                if not data:
+                    break
+                elif data == "<<<close>>>":
+                    self.channel.close()
+                    if isinstance(ssh_obj, paramiko.SSHClient):
+                        ssh_obj.close()
+                    if thread_ssh2_write and isinstance(thread_ssh2_write, SubscribeWriteThread):
+                        thread_ssh2_write.stop()
+                    break
+                if platform.system().lower() == "windows":
+                    sys.stdout.flush()
+                # 计算时差、记录内容
+                end_time = time.time()
+                delay = round(end_time - last_time, 6)
+                last_time = end_time
+                f.writelines([json.dumps([delay, 'o', data]), '\n'])
+                async_to_sync(websocket_channel.send)(self.channel_name, {
+                    "type": "terminal_message",
+                    "message": data
+                })
+            logger.info(f"thread ID = {thread_ssh2_write.ident}  is alive = {thread_ssh2_write.is_alive()}")
+            # 建立 redis 订阅机制, 先有订阅，才能发送
+            redis_instance = redis.Redis(host="127.0.0.1")
+            pubsub = redis_instance.pubsub()
+            pubsub.unsubscribe(self.channel_name)
+            logger.info(f"unsubscribe name = {self.channel_name}")
+            # 入口存储 视频记录
+
+        except Exception as e:
+            logger.exception(e)
+        finally:
+            f.close()
 
 
 class SubscribeWriteThread(threading.Thread):
 
-    def __init__(self, channel_name: str = None, channel: Channel = None):
+    def __init__(self, channel_name: str = None, channel: Channel = None, extra_params: dict = None):
         super(SubscribeWriteThread, self).__init__()
         self.channel_name = channel_name
         self.channel = channel
@@ -135,13 +180,14 @@ class SubscribeWriteThread(threading.Thread):
         redis_instance = redis.Redis(host="127.0.0.1")
         self.pubsub = redis_instance.pubsub()
         self.pubsub.subscribe(self.channel_name)
+        self.extra_params = extra_params
 
     def stop(self):
         self.__control.clear()
 
     def run(self) -> None:
         while self.__control.isSet():
-            result = self.pubsub.get_message()
+            result = self.pubsub.get_message(timeout=0.001)
             if result:
                 logger.debug(f"result = {result}, type = {type(result)}")
                 data = result.get("data")
@@ -157,7 +203,7 @@ class SubscribeWriteThread(threading.Thread):
                     self.channel.send(data.decode())
                 # self.pubsub.publish(self.channel_name, json.dumps({"message": "test"}))
 
-            time.sleep(0.001)
+            # time.sleep(0.001)
 
 
 if __name__ == '__main__':

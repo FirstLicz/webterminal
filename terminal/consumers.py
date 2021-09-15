@@ -29,7 +29,7 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
     async def disconnect(self, code):
-        self.redis_pubsub.publish(self.channel_name, json.dumps({"message": "<<<close>>>"}))
+        self.redis_pubsub.publish(self.channel_name, "<<<close>>>")
 
     def get_pubsub(self):
         redis_instance = redis.Redis(host="127.0.0.1")
@@ -58,7 +58,10 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
                                     password=AesEncrypt().decrypt(con.password),
                                     port=con.port)
                         channel = ssh.invoke_shell(width=width, height=height)
-                        shell = ShellHandler(channel=channel, channel_name=self.channel_name)
+                        shell = ShellHandler(
+                            channel=channel, channel_name=self.channel_name,
+                            extra_params={"ssh": ssh, "width": width, "height": height}
+                        )
                         shell.windows_shell()
                     except socket.timeout:
                         await self.send(text_data=json.dumps({

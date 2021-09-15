@@ -19,4 +19,3 @@ class ChatTest(ChannelsLiveServerTestCase):
 
 
 
-
