@@ -115,17 +115,22 @@ class InteractiveThread(threading.Thread):
     def run(self) -> None:
         websocket_channel = get_channel_layer()
         begin_time = time.time()
-        last_time = begin_time
         ssh_obj = self.extra_params.get("ssh")
         thread_ssh2_write = self.extra_params.get("thread_ssh2_write", None)
         # 记录文件日志, 使用version 2 版本，优化 顺序写文件，防止文件过大，吃内存
-        first_line = {"version": 2, "width": self.extra_params.get("width"), "height": self.extra_params.get("height"),
-                      "timestamp": round(begin_time), "title": "",
-                      "env": {"TERM": "xterm-256color", "SHELL": "/bin/bash"}}
+        first_line = {
+            "version": 2,
+            "width": self.extra_params.get("width") // 9 - 1,
+            "height": self.extra_params.get("height") // 17 - 1,
+            "timestamp": round(begin_time), "title": "",
+            "env": {
+                "TERM": "xterm-256color", "SHELL": "/bin/bash"
+            }
+        }
         target_dir = os.path.join(settings.MEDIA_ROOT, "SSH2")
         if not os.path.isdir(target_dir):
             os.makedirs(target_dir)
-        target_file = os.path.join(target_dir, self.channel_name)
+        target_file = os.path.join(target_dir, self.channel_name.split(".")[1])
         f = open(target_file, 'w', encoding="utf8")
         try:
             f.writelines([json.dumps(first_line), '\n'])
@@ -147,8 +152,10 @@ class InteractiveThread(threading.Thread):
                     sys.stdout.flush()
                 # 计算时差、记录内容
                 end_time = time.time()
-                delay = round(end_time - last_time, 6)
-                last_time = end_time
+                delay = round(end_time - begin_time, 6)
+                # if len(data) == 1 or data == '\r\n':
+                #     f.writelines([json.dumps([delay, 'i', data]), '\n'])
+                # else:
                 f.writelines([json.dumps([delay, 'o', data]), '\n'])
                 async_to_sync(websocket_channel.send)(self.channel_name, {
                     "type": "terminal_message",
@@ -161,7 +168,10 @@ class InteractiveThread(threading.Thread):
             pubsub.unsubscribe(self.channel_name)
             logger.info(f"unsubscribe name = {self.channel_name}")
             # 入口存储 视频记录
-
+            duration_time = end_time -begin_time
+            logger.info(f"duration_time = {round(duration_time)}")
+            time.sleep(0.2)
+            logger.info(f"last thread ID = {thread_ssh2_write.ident}  is alive = {thread_ssh2_write.is_alive()}")
         except Exception as e:
             logger.exception(e)
         finally:
@@ -204,6 +214,7 @@ class SubscribeWriteThread(threading.Thread):
                 # self.pubsub.publish(self.channel_name, json.dumps({"message": "test"}))
 
             # time.sleep(0.001)
+        logger.info(f"SubscribeWriteThread ID = {self.ident} closed")
 
 
 if __name__ == '__main__':
