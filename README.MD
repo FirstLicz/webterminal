@@ -58,6 +58,9 @@
 <script src="/asciinema-player.js"></script>
 </body>
 </html>
-'''
+```
 
-
+## 使用远程桌面 guacamole
+### 安装guacamole 插件[pyguacamole](https://pypi.org/project/pyguacamole/)
+> 1. pip install pyguacamole 
+> 2. 
