@@ -40,3 +40,4 @@ release/*
 releashe
 /apps/script.py
 test
+node_modules
