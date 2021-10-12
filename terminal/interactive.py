@@ -28,15 +28,16 @@ logger = logging.getLogger("default")
 class ShellHandler:
 
     def __init__(self, channel: Channel = None, width=800, height=600, channel_name=None, extra_params: dict = None):
-        self.ssh = paramiko.SSHClient()
-        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            self.ssh.connect(hostname="192.168.1.83", username="root", password="bwda123!@#", port=22)
-        except socket.timeout:
-            print(f"connect 192.168.1.83 failed")
         if channel:
             self.channel = channel
+            self.ssh = extra_params["ssh"]
         else:
+            self.ssh = paramiko.SSHClient()
+            self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            try:
+                self.ssh.connect(hostname="192.168.1.83", username="root", password="bwda123!@#", port=22)
+            except socket.timeout:
+                print(f"connect 192.168.1.83 failed")
             self.channel = self.ssh.invoke_shell(width=width, height=height)
         self.channel_name = channel_name
         self.extra_params = extra_params

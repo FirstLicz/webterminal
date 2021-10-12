@@ -7,6 +7,7 @@ from paramiko import SSHClient, SSHException, AutoAddPolicy
 import socket
 import logging
 import platform
+from django.conf import settings
 
 from terminal.models import Connections
 from utils.encrypt import AesEncrypt
@@ -25,11 +26,15 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
         self.redis_pubsub = self.get_pubsub()
 
     async def connect(self):
-        logger.debug(f"session_id = {self.scope['url_route']['kwargs']['session_id']}")
+        session_id = self.scope['url_route']['kwargs']['session_id']
+        settings.TERMINAL_SESSION_DICT[session_id] = None
+        logger.debug(f"session_id = {session_id}")
         await self.accept()
 
     async def disconnect(self, code):
         self.redis_pubsub.publish(self.channel_name, "<<<close>>>")
+        session_id = self.scope['url_route']['kwargs']['session_id']
+        del settings.TERMINAL_SESSION_DICT[session_id]
 
     def get_pubsub(self):
         redis_instance = redis.Redis(host="127.0.0.1")
@@ -38,10 +43,11 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
     # 数据库 访问
     @database_sync_to_async
     def get_connect(self):
-        con = Connections.objects.get(id=2)
+        con = Connections.objects.get(id=1)
         return con
 
     async def receive(self, text_data=None, bytes_data=None):
+        session_id = self.scope['url_route']['kwargs']['session_id']
         logger.debug(f"text_data = {text_data}, type = {type(text_data)}")
         if text_data:
             try:
@@ -62,7 +68,10 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
                             channel=channel, channel_name=self.channel_name,
                             extra_params={"ssh": ssh, "width": width, "height": height}
                         )
+                        # 根据操作系统 设定 使用
                         shell.windows_shell()
+                        # 把会话 存储到 全局管理 列表中
+                        settings.TERMINAL_SESSION_DICT[session_id] = shell
                     except socket.timeout:
                         await self.send(text_data=json.dumps({
                             "message": f"\033[1;3;31m Connect to server {con.server} time out\033[0m"

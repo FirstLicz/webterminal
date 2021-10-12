@@ -6,5 +6,6 @@ urlpatterns = [
     path('', views.WebSshTwoView.as_view(), name='index'),
     path('test/', views.TestView.as_view(), name='test'),
     path('playVideo/', views.TerminalPlayView.as_view(), name='play_video'),
+    path('sftp/<str:token>/', views.TerminalSftp.as_view(), name='terminal_sftp'),
 ]
 

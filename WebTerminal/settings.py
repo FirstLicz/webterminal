@@ -213,6 +213,11 @@ LOGGING = {
             'level': "DEBUG",
             'propagate': False,
         },
+        'test': {
+            'handlers': ['console'],
+            'level': "DEBUG",
+            'propagate': False,
+        },
     },
 }
 
@@ -227,3 +232,6 @@ LOGGING = {
 #         }
 #     }
 # }
+
+# 全局变量控制 websocket 中线程对象
+TERMINAL_SESSION_DICT = {}
