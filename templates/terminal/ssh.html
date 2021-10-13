@@ -10,6 +10,30 @@
     <script src="{% static 'plugins/jQuery/jquery-2.2.3.min.js' %}"></script>
     <script src="{% static 'plugins/bootstrap/bootstrap.min.js' %}"></script>
     <link rel="stylesheet" href="{% static 'plugins/bootstrap/bootstrap.min.css' %}"/>
+    <style>
+        .custom-breadcrumb-item + .custom-breadcrumb-item {
+            /*padding-left: .5rem*/
+        }
+
+        .custom-breadcrumb-item + .custom-breadcrumb-item::before {
+            display: inline-block;
+            /*padding-right: .5rem;*/
+            color: #6c757d;
+            content: "/"
+        }
+
+        .custom-breadcrumb-item + .custom-breadcrumb-item:hover::before {
+            text-decoration: underline
+        }
+
+        .custom-breadcrumb-item + .custom-breadcrumb-item:hover::before {
+            text-decoration: none
+        }
+
+        .custom-breadcrumb-item.active {
+            color: #6c757d
+        }
+    </style>
 </head>
 <body style="margin: 0">
 <div class="row" style="width: 100vw;">
@@ -18,7 +42,8 @@
     </div>
     <div id="right_div" class="col-md-3 col-sm-3 col-xl-3 col-lg-3" style="padding-left: 0; padding-right: 0;">
         <!-- 按钮组 -->
-        <div style="margin: 0px 5px 5px 5px; width: 100%; padding-right: 8px" class="btn-group btn-group-sm btn-group-lg btn-group-xl btn-group-xs">
+        <div style="margin: 0px 5px 5px 5px; width: 100%; padding-right: 8px"
+             class="btn-group btn-group-sm btn-group-lg btn-group-xl btn-group-xs">
             <button type="button" class="btn btn-outline-primary" style="width: 25%;">
                 <svg t="1634025990092" class="icon" viewBox="0 0 1129 1024" version="1.1"
                      xmlns="http://www.w3.org/2000/svg" p-id="2482" width="16" height="16">
@@ -64,11 +89,17 @@
         </div>
         <div id="file_list_display" style="flex:1">
             <nav class="breadcrumb">
-                <a class="breadcrumb-item" href="#">Home</a>
-                <a class="breadcrumb-item" href="#">Library</a>
-                <a class="breadcrumb-item" href="#">Data</a>
+                <a class="custom-breadcrumb-item" href="#">Home</a>
+                <a class="custom-breadcrumb-item" href="#">Library</a>
+                <a class="custom-breadcrumb-item" href="#">Data</a>
+                <a class="custom-breadcrumb-item" href="#">Library</a>
+                <a class="custom-breadcrumb-item" href="#">Data</a>
+                <a class="custom-breadcrumb-item" href="#">Library</a>
+                <a class="custom-breadcrumb-item" href="#">Data</a>
+                <a class="custom-breadcrumb-item" href="#">Library</a>
+                <a class="custom-breadcrumb-item" href="#">Data</a>
             </nav>
-            <div id="scroll_id" style="height:calc(100vh - 118px);overflow-y: scroll;">
+            <div id="scroll_id" style="overflow-y: scroll;">
 
             </div>
         </div>
@@ -88,16 +119,18 @@
         '                <path d="M815.104 69.632q27.648 25.6 44.032 42.496t25.088 28.672 10.752 19.968 2.048 14.336l0 16.384-151.552 0q-10.24 0-17.92-7.68t-12.8-17.92-7.68-20.992-2.56-16.896l0-126.976 3.072 0q8.192 0 16.896 2.56t19.968 9.728 28.16 20.48 42.496 35.84zM640 129.024q0 20.48 6.144 42.496t19.456 40.96 33.792 31.232 48.128 12.288l149.504 0 0 577.536q0 29.696-11.776 53.248t-31.232 39.936-43.008 25.6-46.08 9.216l-503.808 0q-19.456 0-42.496-11.264t-43.008-29.696-33.28-41.984-13.312-49.152l0-696.32q0-21.504 9.728-44.544t26.624-42.496 38.4-32.256 45.056-12.8l391.168 0 0 128zM704.512 768q26.624 0 45.056-18.944t18.432-45.568-18.432-45.056-45.056-18.432l-384 0q-26.624 0-45.056 18.432t-18.432 45.056 18.432 45.568 45.056 18.944l384 0zM768 448.512q0-26.624-18.432-45.568t-45.056-18.944l-384 0q-26.624 0-45.056 18.944t-18.432 45.568 18.432 45.056 45.056 18.432l384 0q26.624 0 45.056-18.432t18.432-45.056z"\n' +
         '                      p-id="4547" fill="#13227a"></path>\n' +
         '            </svg>'
-    var file_list_scroll = document.getElementById("file_list_display")
+    var files_display = $('#file_list_display');
+    var file_list_scroll = $("#scroll_id")
     var files = [];
 
     // 请求 sftp 文件列表
-    function file_list(path) {
+    function file_list(path, cmd) {
         $.ajax({
             url: "/terminal/sftp/{{ session_id }}/",
             type: "GET",
             data: {
-                path: path
+                path: path,
+                cmd: cmd
             },
             success: function (data) {
                 console.log(data)
@@ -109,7 +142,7 @@
                         $("#scroll_id").append('<div>\n' +
                             '                    <label class="checkbox inline font-size"\n' +
                             '                           style="float: left; overflow: hidden; white-space: nowrap;width: 80%;text-overflow: ellipsis;">\n' +
-                            '                        <input type="checkbox" style="vertical-align: middle;" value="' + files[i].name +'">\n' + folder_tag  + files[i].name +
+                            '                        <input type="checkbox" style="vertical-align: middle;" value="' + files[i].name + '">\n' + folder_tag + "&nbsp;" + files[i].name +
                             '                    </label>\n' +
                             '                    <label class="checkbox inline font-size" style="float: right; width: 20%; text-align: right">\n' +
                             '                        -\n' +
@@ -120,7 +153,7 @@
                         $("#scroll_id").append('<div>\n' +
                             '                    <label class="checkbox inline font-size"\n' +
                             '                           style="float: left; overflow: hidden; white-space: nowrap;width: 80%;text-overflow: ellipsis;">\n' +
-                            '                        <input type="checkbox" style="vertical-align: middle;" value="' + files[i].name +'">\n' + file_tag + files[i].name +
+                            '                        <input type="checkbox" style="vertical-align: middle;" value="' + files[i].name + '">\n' + file_tag + "&nbsp;" + files[i].name +
                             '                    </label>\n' +
                             '                    <label class="checkbox inline font-size" style="float: right; width: 20%; text-align: right">\n' + files[i].size +
                             '                    </label>\n' +
@@ -161,12 +194,21 @@
         term.loadAddon(fitAddon)/**/
         term.open(terminal);
         term.focus()
+        // 页面加载好，进行设定
+        file_list_scroll.css({
+            "height": $("#right_div").height() - file_list_scroll.position().top
+        })
+        console.log(files_display.height())
         window.onresize = function () { // 窗口尺寸变化时，终端尺寸自适应
             // 发送 窗口 改变大小
             term.resize(parseInt(left_div.width() / 9), parseInt(window.innerHeight / 17))
             fitAddon.fit()
+            console.log("window.innerHeight = " + window.innerHeight)
+            // 改变滚动窗口的高度
+            file_list_scroll.css({
+                "height": window.innerHeight - file_list_scroll.position().top
+            })
         }
-
         // term.write('Hello from \x1B[1;3;31mxterm.js\x1B[0m $ ')
         ws.onopen = function () {
             // 当 websocket 创建成功时，触发事件
@@ -177,7 +219,7 @@
             // console.log(event.data)
             if (load_flag) {
                 // 获取文件列表
-                file_list();
+                file_list("/", "ls");
                 load_flag = false;
             }
         }
@@ -187,8 +229,6 @@
         ws.onerror = function (event) {
             console.log(event)
         }
-        console.log(document.body.offsetHeight)
-        console.log(file_list_scroll.offsetHeight)
     });
 
 </script>
