@@ -57,7 +57,7 @@ class TestApiView(View):
 
 class TerminalSftp(View):
     """
-        文件列表
+        文件列表, post/get 请求都需要把文件列表 重新发送一遍
     """
 
     @staticmethod
@@ -78,19 +78,42 @@ class TerminalSftp(View):
             result_list.append(_dict)
         return result_list
 
+    def sftp_storage(self, token, cmd, path):
+        storage = SFTPStorage(token)
+        if cmd == "download":
+            # 下载，直接退出相应
+            pass
+        elif cmd == "upload":
+            pass
+        dirs, files = storage.listdir(path)
+        file_list = self.response_files(storage, files, dirs)
+        return JsonResponse({
+            "cwd": path,
+            "files": file_list
+        })
+
+    def ftp_storage(self):
+        pass
+
+    def rdp_storage(self):
+        pass
+
+    def render_to_response(self, **kwargs):
+        return
+
     def get(self, request, token):
         path = request.GET.get('path', "/")
-        logger.info(f"token = {token}, param = {path}")
+        cmd = request.GET.get('cmd', "ls")
+        option = request.GET.get('option', "sftp")
+        logger.info(f"token = {token}, param = {path}, option = {option}")
         try:
             shell = settings.TERMINAL_SESSION_DICT[token]
             logger.info(f"shell object = {shell}")
-            storage = SFTPStorage(token)
-            dirs, files = storage.listdir(path)
-            _files = self.response_files(storage, files, dirs)
-            return JsonResponse({
-                "cwd": path,
-                "files": _files
-            })
+            if option == "sftp":
+                return self.sftp_storage(token, cmd, path)
+            else:
+                dirs, files = list(), list()
+            return
         except (ValueError, KeyError) as e:
             logger.exception(e)
             return JsonResponse({

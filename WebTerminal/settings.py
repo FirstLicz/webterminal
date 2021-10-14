@@ -140,7 +140,7 @@ if not os.path.isdir(MEDIA_ROOT):
 if DEBUG:
     STATICFILES_DIRS = [
         ("css", Path(BASE_DIR, "static", "css").as_posix()),
-        ("js", Path(BASE_DIR, "static", "css").as_posix()),
+        ("js", Path(BASE_DIR, "static", "js").as_posix()),
         ("plugins", Path(BASE_DIR, "static", "plugins").as_posix()),
     ]
 else:
