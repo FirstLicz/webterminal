@@ -33,7 +33,6 @@ function init_nav(path) {
             path = path.slice(0, path.length - 1)
         }
         var path_list = path.split("/")
-        console.log(path_list)
         for (var i = 0; i < path_list.length; i++) {
             if (i === 0 && path_list[i] === "") {
                 nav_node.append(
@@ -50,19 +49,30 @@ function init_nav(path) {
 }
 
 function get_path(){
-    var nav_path = $("#branding_nav")
-    nav_path.children()
+    let nav_path = $("#branding_nav")
+    let node_list = nav_path.children();
+    let path_list = []
+    for (let i = 0; i < node_list.length; i++) {
+        if (node_list[i].text === "/") {
+            path_list.push("")
+        } else {
+            path_list.push(node_list[i].text)
+        }
+    }
+    path_list.push("")
+    console.log(path_list)
+    return path_list.join("/")
 }
 
 function command(cmd) {
     // 命令: 按钮执行方法 入口
-    var path = "";
+    var path = get_path();
     if (cmd === "refresh") {
         refresh(path)
     } else if (cmd === "upload") {
 
     } else if (cmd === "download") {
-
+        download()
     }
 }
 
@@ -75,14 +85,54 @@ function request_post() {
     })
 }
 
+function request_get(path, name) {
+    // 获取文件对象
+    if (window.download_to_local) {
+        // 可选地，上面的请求可以这样做
+        var iframe = window.document.createElement("iframe");
+        iframe.style.display = "none"; // 防止影响页面
+        iframe.style.height = 0; // 防止影响页面
+        iframe.src = window.global_url + "?" + jQuery.param({
+            cmd: "download",
+            path: path,
+            name: name
+        });
+        window.document.body.appendChild(iframe); // 这一行必须，iframe挂在到dom树上才会发请求
+    } else {
+        $.ajax({
+            url: window.global_url,
+            data: {
+                cmd: "download",
+                path: path,
+                name: name
+            },
+            success: function () {
+
+            }
+        })
+    }
+
+}
+
 
 function refresh(path) {
     // 刷新当前 目录
     window.file_list(path, "ls");
 }
 
-function download(path, names) {
+function download() {
     // 支持批量下载
+    var path = get_path();
+    console.log("path = " + path)
+    // 处理目录 列表
+    $(":checkbox[name='checkBoxDirs']:checked").each(function () {
+
+    })
+    // 处理文件列表
+    $(":checkbox[name='checkBoxFiles']:checked").each(function () {
+        console.log("download filename = " + $(this).val())
+        request_get(path, $(this).val())
+    })
 }
 
 function upload(path) {

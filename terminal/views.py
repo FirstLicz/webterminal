@@ -1,11 +1,16 @@
 from django.shortcuts import render
 from django.views.generic import View
-from django.http.response import JsonResponse
+from django.http.response import JsonResponse, FileResponse, StreamingHttpResponse
 from django.conf import settings
+from django.utils.encoding import escape_uri_path
+
+from pathlib import Path
 import uuid
 import logging
+import io
 
 from common.custom_storge import SFTPStorage
+from common.utils import SFTPFileResponse
 
 logger = logging.getLogger("test" if settings.DEBUG else "default")
 
@@ -78,11 +83,17 @@ class TerminalSftp(View):
             result_list.append(_dict)
         return result_list
 
-    def sftp_storage(self, token, cmd, path):
+    def sftp_storage(self, token, cmd, path, name):
         storage = SFTPStorage(token)
         if cmd == "download":
             # 下载，直接退出相应
-            pass
+            file = io.BytesIO()
+            storage.write(Path(path, name).as_posix(), file)
+            file.seek(0)
+            # file = open(r'F:\bwd_workspace\gitspace\github\personal\webterminal\terminal\urls.py', 'rb')
+            # name = "urls.py"
+            response = FileResponse(file, filename=name)
+            return response
         elif cmd == "upload":
             pass
         dirs, files = storage.listdir(path)
@@ -105,12 +116,13 @@ class TerminalSftp(View):
         path = request.GET.get('path', "/")
         cmd = request.GET.get('cmd', "ls")
         option = request.GET.get('option', "sftp")
-        logger.info(f"token = {token}, param = {path}, option = {option}")
+        name = request.GET.get("name", "")
+        logger.info(f"token = {token}, param = {path}, option = {option}, name = {name}")
         try:
             shell = settings.TERMINAL_SESSION_DICT[token]
             logger.info(f"shell object = {shell}")
             if option == "sftp":
-                return self.sftp_storage(token, cmd, path)
+                return self.sftp_storage(token, cmd, path, name)
             else:
                 dirs, files = list(), list()
             return

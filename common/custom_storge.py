@@ -4,6 +4,7 @@ from django.conf import settings
 import stat
 from pathlib import Path
 import logging
+import io
 
 logger = logging.getLogger("test" if settings.DEBUG else "default")
 
@@ -22,8 +23,16 @@ class SFTPStorage(Storage):
     def __del__(self):
         self.sftp.close()
 
-    def _open(self, name, mode="rb"):
-        pass
+    def _open(self, filename, mode='rb'):
+        return self.sftp.open(filename, mode)
+
+    def write(self, filename, fl):
+        s = self.sftp.stat(filename)
+        size = self.sftp.getfo(filename, fl)
+        if s.st_size != size:
+            raise IOError(
+                "size mismatch in get!  {} != {}".format(s.st_size, size)
+            )
 
     def _save(self, name, **kwargs):
         pass

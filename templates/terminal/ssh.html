@@ -10,6 +10,7 @@
     <script src="{% static 'plugins/jQuery/jquery-2.2.3.min.js' %}"></script>
     <script src="{% static 'plugins/bootstrap/bootstrap.min.js' %}"></script>
     <link rel="stylesheet" href="{% static 'plugins/bootstrap/bootstrap.min.css' %}"/>
+    <script src="{% static 'js/axios.min.js' %}"></script>
     <style>
         .custom-breadcrumb-item + .custom-breadcrumb-item {
             /*padding-left: .5rem*/
@@ -61,7 +62,7 @@
                 </svg>
                 上传
             </button>
-            <button type="button" class="btn btn-outline-primary" style="width: 25%;">
+            <button type="button" class="btn btn-outline-primary" style="width: 25%;" onclick="command('download')">
                 <svg t="1634026139547" class="icon" viewBox="0 0 1024 1024" version="1.1"
                      xmlns="http://www.w3.org/2000/svg" p-id="7223" width="16" height="16">
                     <path d="M518.981818 721.454545h223.418182a370.501818 370.501818 0 0 0-336.989091-465.454545v46.545455h-46.545454v-46.545455a372.363636 372.363636 0 1 0 368.407272 512h-209.454545z m-136.843636 46.545455l-139.636364-162.909091h116.363637V372.363636h46.545454v232.727273h116.363636z"
@@ -104,6 +105,7 @@
     var session_id = "{{ session_id }}"; // 当前会话ID
     var global_url = "/terminal/sftp/{{ session_id }}/";
     var load_flag = true;
+    var download_to_local = true;
     var left_div = $("#left_div")
     var folder_tag = '<svg t="1634025286076" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"\n' +
         '                 p-id="5662" width="16" height="16">\n' +
@@ -145,7 +147,7 @@
                         $("#scroll_id").append('<div>\n' +
                             '                    <label class="checkbox inline font-size"\n ondblclick="file_list(\'' + _path + '/' + files[i].name + '\')\"' +
                             '                           style="float: left; overflow: hidden; white-space: nowrap;width: 75%;text-overflow: ellipsis;">\n' +
-                            '                        <input type="checkbox" class="file_elem" style="vertical-align: middle;" value="' + files[i].name + '">\n' + folder_tag + "&nbsp;" + files[i].name +
+                            '                        <input type="checkbox" name="checkBoxDirs" class="file_elem" style="vertical-align: middle;" value="' + files[i].name + '">\n' + folder_tag + "&nbsp;" + files[i].name +
                             '                    </label>\n' +
                             '                    <label class="checkbox inline font-size" style="float: right; width: 25%; text-align: right">\n' +
                             '                        -\n' +
@@ -156,7 +158,7 @@
                         $("#scroll_id").append('<div>\n' +
                             '                    <label class="checkbox inline font-size"\n' +
                             '                           style="float: left; overflow: hidden; white-space: nowrap;width: 75%;text-overflow: ellipsis;">\n' +
-                            '                        <input type="checkbox" class="file_elem" style="vertical-align: middle;" value="' + files[i].name + '">\n' + file_tag + "&nbsp;" + files[i].name +
+                            '                        <input type="checkbox" name="checkBoxFiles" class="file_elem" style="vertical-align: middle;" value="' + files[i].name + '">\n' + file_tag + "&nbsp;" + files[i].name +
                             '                    </label>\n' +
                             '                    <label class="checkbox inline font-size" style="float: right; width: 25%; text-align: right">\n' + diskSize(files[i].size) +
                             '                    </label>\n' +

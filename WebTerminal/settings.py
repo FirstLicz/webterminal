@@ -235,3 +235,6 @@ LOGGING = {
 
 # 全局变量控制 websocket 中线程对象
 TERMINAL_SESSION_DICT = {}
+
+# 浏览器 iframe
+X_FRAME_OPTIONS = 'SAMEORIGIN'
