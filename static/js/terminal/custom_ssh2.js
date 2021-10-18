@@ -97,6 +97,9 @@ function request_get(path, name) {
             path: path,
             name: name
         });
+        iframe.onload = function () {
+            this.parentNode.removeChild(this);
+        }
         window.document.body.appendChild(iframe); // 这一行必须，iframe挂在到dom树上才会发请求
     } else {
         $.ajax({

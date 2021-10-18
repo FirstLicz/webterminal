@@ -3,11 +3,13 @@ from django.views.generic import View
 from django.http.response import JsonResponse, FileResponse, StreamingHttpResponse
 from django.conf import settings
 from django.utils.encoding import escape_uri_path
+from wsgiref.util import FileWrapper
 
 from pathlib import Path
 import uuid
 import logging
 import io
+import tempfile
 
 from common.custom_storge import SFTPStorage
 from common.utils import SFTPFileResponse
@@ -92,7 +94,7 @@ class TerminalSftp(View):
             file.seek(0)
             # file = open(r'F:\bwd_workspace\gitspace\github\personal\webterminal\terminal\urls.py', 'rb')
             # name = "urls.py"
-            response = FileResponse(file, filename=name)
+            response = SFTPFileResponse(file, filename=name)
             return response
         elif cmd == "upload":
             pass

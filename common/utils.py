@@ -6,8 +6,9 @@ from django.http.response import FileResponse, StreamingHttpResponse
 
 class SFTPFileResponse(StreamingHttpResponse):
 
-    def __init__(self, streaming_content=(), *args, **kwargs):
+    def __init__(self, streaming_content=(), filename="", *args, **kwargs):
         super(SFTPFileResponse, self).__init__(streaming_content, *args, **kwargs)
+        self.set_headers(filename)
 
     def set_headers(self, filename, as_attachment=False):
         """
@@ -23,8 +24,6 @@ class SFTPFileResponse(StreamingHttpResponse):
             if filename:
                 content_type, encoding = mimetypes.guess_type(filename)
                 # Encoding isn't set to prevent browsers from automatically
-                # uncompressing files.
-                content_type = encoding_map.get(encoding, content_type)
                 self.headers['Content-Type'] = content_type or 'application/octet-stream'
             else:
                 self.headers['Content-Type'] = 'application/octet-stream'
