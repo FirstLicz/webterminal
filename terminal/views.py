@@ -23,8 +23,20 @@ logger = logging.getLogger("test" if settings.DEBUG else "default")
 class WebSshTwoView(View):
 
     def get(self, request):
+        room_id = request.GET.get("room_id")  # 可以随机生成、但是要入库-->找到即可
         return render(request, "terminal/ssh.html", {
             "session_id": uuid.uuid1().hex,
+            "room_id": room_id
+        })
+
+
+class WebSShTwoMonitorView(View):
+
+    def get(self, request):
+        room_id = request.GET.get("room_id")
+        return render(request, "terminal/ssh2Monitor.html", {
+            "session_id": uuid.uuid1().hex,
+            "room_id": room_id
         })
 
 
@@ -90,7 +102,7 @@ class TerminalSftp(View):
         if cmd == "download":
             # 下载，直接退出相应
             file = io.BytesIO()
-            storage.write(Path(path, name).as_posix(), file)
+            storage.write(name, file)
             file.seek(0)
             # file = open(r'F:\bwd_workspace\gitspace\github\personal\webterminal\terminal\urls.py', 'rb')
             # name = "urls.py"

@@ -64,3 +64,9 @@
 ### 安装guacamole 插件[pyguacamole](https://pypi.org/project/pyguacamole/)
 > 1. pip install pyguacamole 
 > 2. 
+
+## django websocket 实现 监听
+> pip install -U [channels](https://channels.readthedocs.io/en/stable/installation.html)
+> 
+> 4A V2.3版本需要实现
+> 

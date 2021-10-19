@@ -16,6 +16,7 @@ import redis
 import json
 import time
 import platform
+import uuid
 
 try:
     import select
@@ -27,7 +28,8 @@ logger = logging.getLogger("default")
 
 class ShellHandler:
 
-    def __init__(self, channel: Channel = None, width=800, height=600, channel_name=None, extra_params: dict = None):
+    def __init__(self, channel: Channel = None, width=800, height=600, channel_name=None, extra_params: dict = None,
+                 room_id: str = None):
         if channel:
             self.channel = channel
             self.ssh = extra_params["ssh"]
@@ -41,16 +43,17 @@ class ShellHandler:
             self.channel = self.ssh.invoke_shell(width=width, height=height)
         self.channel_name = channel_name
         self.extra_params = extra_params
+        self.room_id = room_id
 
     def __del__(self):
         self.ssh.close()
 
     def windows_shell(self):
         logger.info(f"channel = {self.channel}")
-        write = SubscribeWriteThread(channel=self.channel, channel_name=self.channel_name)
+        write = SubscribeWriteThread(channel=self.channel, channel_name=self.channel_name, room_id=self.room_id)
         write.start()
         self.extra_params["thread_ssh2_write"] = write
-        display = InteractiveThread(channel=self.channel, channel_name=self.channel_name,
+        display = InteractiveThread(channel=self.channel, channel_name=self.channel_name, room_id=self.room_id,
                                     extra_params=self.extra_params)
         display.start()
         # 接收前端页面输入内容，发送到 shell
@@ -93,7 +96,7 @@ class ShellHandler:
 
 class InteractiveThread(threading.Thread):
 
-    def __init__(self, channel: Channel = None, channel_name=None, extra_params: dict = None):
+    def __init__(self, channel: Channel = None, channel_name=None, extra_params: dict = None, room_id: str = None):
         super(InteractiveThread, self).__init__()
         self.__control = threading.Event()  # 暂停控制标识
         self.__run_control = threading.Event()  # 停止控制
@@ -102,6 +105,7 @@ class InteractiveThread(threading.Thread):
         self.channel = channel
         self.channel_name = channel_name
         self.extra_params = extra_params
+        self.room_id = room_id
 
     def pause(self):
         self.__control.clear()  # 设置为False, 让现场阻塞
@@ -131,7 +135,8 @@ class InteractiveThread(threading.Thread):
         target_dir = os.path.join(settings.MEDIA_ROOT, "SSH2")
         if not os.path.isdir(target_dir):
             os.makedirs(target_dir)
-        target_file = os.path.join(target_dir, self.channel_name.split(".")[1])
+        # target_file = os.path.join(target_dir, self.channel_name.split(".")[1])   # 默认单通道
+        target_file = os.path.join(target_dir, self.channel_name + "_" + uuid.uuid1().hex)  # 团体通道
         f = open(target_file, 'w', encoding="utf8")
         try:
             f.writelines([json.dumps(first_line), '\n'])
@@ -158,16 +163,22 @@ class InteractiveThread(threading.Thread):
                 #     f.writelines([json.dumps([delay, 'i', data]), '\n'])
                 # else:
                 f.writelines([json.dumps([delay, 'o', data]), '\n'])
-                async_to_sync(websocket_channel.send)(self.channel_name, {
+                # 分组 发送
+                async_to_sync(websocket_channel.group_send)(self.room_id, {
                     "type": "terminal_message",
-                    "message": data
+                    "message": u(data)
                 })
+                # 单通道发送
+                # async_to_sync(websocket_channel.send)(self.channel_name, {
+                #     "type": "terminal_message",
+                #     "message": data
+                # })
             logger.info(f"thread ID = {thread_ssh2_write.ident}  is alive = {thread_ssh2_write.is_alive()}")
             # 建立 redis 订阅机制, 先有订阅，才能发送
             redis_instance = redis.Redis(host="127.0.0.1")
             pubsub = redis_instance.pubsub()
-            pubsub.unsubscribe(self.channel_name)
-            logger.info(f"unsubscribe name = {self.channel_name}")
+            pubsub.unsubscribe(self.room_id)
+            logger.info(f"unsubscribe name = {self.room_id}")
             # 入口存储 视频记录
             duration_time = end_time -begin_time
             logger.info(f"duration_time = {round(duration_time)}")
@@ -181,7 +192,7 @@ class InteractiveThread(threading.Thread):
 
 class SubscribeWriteThread(threading.Thread):
 
-    def __init__(self, channel_name: str = None, channel: Channel = None, extra_params: dict = None):
+    def __init__(self, channel_name: str = None, channel: Channel = None, extra_params: dict = None, room_id: str = None):
         super(SubscribeWriteThread, self).__init__()
         self.channel_name = channel_name
         self.channel = channel
@@ -190,8 +201,9 @@ class SubscribeWriteThread(threading.Thread):
         # 建立 redis 订阅机制, 先有订阅，才能发送
         redis_instance = redis.Redis(host="127.0.0.1")
         self.pubsub = redis_instance.pubsub()
-        self.pubsub.subscribe(self.channel_name)
         self.extra_params = extra_params
+        self.room_id = room_id  # redis 订阅
+        self.pubsub.subscribe(self.room_id)
 
     def stop(self):
         self.__control.clear()

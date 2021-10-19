@@ -191,7 +191,7 @@
         term._initialized = true;
         // 创建 websocket
         var ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
-        var url = ws_scheme + "://127.0.0.1:8000/ws/terminal/{{ session_id }}/?room_id={{ room_id }}"
+        var url = ws_scheme + "://127.0.0.1:8000/ws/terminal/monitor/{{ session_id }}/?room_id={{ room_id }}"
         var ws = new WebSocket(url);
         var fitAddon = new FitAddon.FitAddon()
         var attachAddon = new AttachAddon.AttachAddon(ws)
@@ -218,7 +218,7 @@
         ws.onopen = function () {
             // 当 websocket 创建成功时，触发事件
             console.log("open websocket")
-            ws.send(JSON.stringify(["ip", terminal.offsetWidth, terminal.offsetHeight])); // 将消息发出
+            // ws.send(JSON.stringify(["ip", terminal.offsetWidth, terminal.offsetHeight])); // 将消息发出
         }
         ws.onmessage = function (event) {
             // console.log(event.data)

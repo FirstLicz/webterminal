@@ -168,7 +168,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname}-{asctime}-{module}-{process:d}-{thread:d}:{message}',
+            'format': '{levelname}-{asctime}-{module}-{process:d}-{lineno:d}:{message}',
             'style': '{',
         },
         'simple': {
@@ -179,7 +179,7 @@ LOGGING = {
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'simple',
+            'formatter': 'verbose',
         },
         'mail_admins': {
             'level': 'ERROR',

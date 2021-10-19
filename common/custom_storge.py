@@ -5,6 +5,7 @@ import stat
 from pathlib import Path
 import logging
 import io
+import os
 
 logger = logging.getLogger("test" if settings.DEBUG else "default")
 
@@ -26,7 +27,8 @@ class SFTPStorage(Storage):
     def _open(self, filename, mode='rb'):
         return self.sftp.open(filename, mode)
 
-    def write(self, filename, fl):
+    def write(self, name, fl):
+        filename = Path(self.sftp.getcwd(), name)
         s = self.sftp.stat(filename)
         size = self.sftp.getfo(filename, fl)
         if s.st_size != size:
@@ -133,3 +135,24 @@ class SFTPStorage(Storage):
     def stat(self, name):
         filename = Path(self.sftp.getcwd(), name).as_posix()
         return self.sftp.lstat(filename)
+
+
+class CustomSFTPFile:
+
+    def __init__(self, storage: SFTPStorage = None, filename=None):
+        self.storage = storage
+        self.filename = filename
+        self.file = io.BytesIO()
+
+    def download(self):
+        if stat.S_ISDIR(self.storage.stat(name=self.filename)):
+            ssh2_tmp_dir = os.path.join(settings.MEDIA_ROOT, "ssh2_tmp")
+            if os.path.isdir(ssh2_tmp_dir):
+                os.makedirs(ssh2_tmp_dir, exist_ok=True)
+            tmp_session_id = os.path.join(ssh2_tmp_dir, self.storage.token)
+            if os.path.isdir(tmp_session_id):
+                os.makedirs(tmp_session_id, exist_ok=True)
+
+        else:
+            self.storage.write(self.filename, self.file)
+            self.file.seek(0)
