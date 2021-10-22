@@ -142,7 +142,7 @@ class InteractiveThread(threading.Thread):
             f.writelines([json.dumps(first_line), '\n'])
             while self.__run_control.isSet():
                 self.__control.wait()  # 为True时立即返回，为False时阻塞直到内部设置为True返回
-                data = self.channel.recv(1024)
+                data = self.channel.recv(4096)
                 data = u(data)
                 logger.info(f"recv data = {data}")
                 if not data:
