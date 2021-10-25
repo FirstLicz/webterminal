@@ -4,16 +4,19 @@
     {% load static %}
     <title>Xterm</title>
     <link rel="stylesheet" href="{% static 'plugins/xterm/css/xterm.css' %}"/>
+    <link rel="stylesheet" href="{% static 'plugins/jquery-contextmenu-js/dist/jquery.contextMenu.css' %}"/>
     <script src="{% static 'plugins/xterm/lib/xterm.js' %}"></script>
     <script src="{% static 'plugins/xterm-addon-attach/lib/xterm-addon-attach.js' %}"></script>
     <script src="{% static 'plugins/xterm-addon-fit/lib/xterm-addon-fit.js' %}"></script>
     <script src="{% static 'plugins/jQuery/jquery-2.2.3.min.js' %}"></script>
-
+    <script src="{% static 'plugins/jquery-contextmenu-js/dist/jquery.contextMenu.js' %}"></script>
+    <script src="{% static 'plugins/jquery-contextmenu-js/dist/jquery.ui.position.js' %}"></script>
 </head>
 <body style="margin: 0">
 <div id="terminal"></div>
 <script src="{% static 'js/terminal/custom_ssh2.js' %}"></script>
 <script>
+    var can_control = false;
     $(function () {
         var term = new Terminal({
             // cursorStyle: 'underline', //光标样式
@@ -39,11 +42,39 @@
         var url = ws_scheme + "://127.0.0.1:8000/ws/terminal/monitor/{{ session_id }}/?room_id={{ room_id }}"
         var ws = new WebSocket(url);
         var fitAddon = new FitAddon.FitAddon()
-        var attachAddon = new AttachAddon.AttachAddon(ws)
-        term.loadAddon(attachAddon)
-        term.loadAddon(fitAddon)/**/
+        /*var attachAddon = new AttachAddon.AttachAddon(ws)
+        term.loadAddon(attachAddon)*/
+        term.loadAddon(fitAddon)
         term.open(terminal);
         term.focus()
+
+        //初始化菜单
+        $.contextMenu({
+            selector: '#terminal',
+            zIndex: 9999999,
+            items: {
+                "keyboard": {
+                    name: "控制键盘", icon: "keyboard",
+                    callback: function (itemKey, opt, rootMenu, originalEvent) {
+                        can_control = true;
+                    },
+                    disabled: function () {
+                        var status = can_control ? true : false;
+                        return status;
+                    }
+                },
+                "keyboard-off": {
+                    name: "取消控制键盘", icon: "keyboard-off",
+                    callback: function (itemKey, opt, rootMenu, originalEvent) {
+                        can_control = false;
+                    },
+                    disabled: function () {
+                        var status = can_control ? false : true;
+                        return status;
+                    }
+                },
+            }
+        });
 
         window.onresize = function () { // 窗口尺寸变化时，终端尺寸自适应
             // 发送 窗口 改变大小
@@ -57,13 +88,17 @@
             console.log("open websocket")
             // ws.send(JSON.stringify(["ip", terminal.offsetWidth, terminal.offsetHeight])); // 将消息发出
         }
+        term.onKey(function (e) {
+            // 重写键盘事件
+            console.log(e.key)
+            if (can_control) {
+                ws.send(e.key)
+            }
+        })
+
         ws.onmessage = function (event) {
             // console.log(event.data)
-            if (load_flag) {
-                // 获取文件列表
-                file_list("/", "ls");
-                load_flag = false;
-            }
+            term.write(event.data)
         }
         ws.onclose = function (event) {
             console.log(event)
