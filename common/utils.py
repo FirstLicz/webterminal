@@ -37,3 +37,30 @@ class SFTPFileResponse(StreamingHttpResponse):
                 file_expr = "filename*=utf-8''{}".format(quote(filename))
             self.headers['Content-Disposition'] = '{}; {}'.format(disposition, file_expr)
 
+
+class StreamingFileResponse(StreamingHttpResponse):
+
+    def __init__(self, streaming_content=(), filename="", *args, **kwargs):
+        super(StreamingFileResponse, self).__init__(streaming_content, *args, **kwargs)
+        self.set_headers(filename)
+
+    def set_headers(self, filename, as_attachment=False):
+        """
+        Set some common response headers (Content-Length, Content-Type, and
+        Content-Disposition) based on the `filelike` response content.
+        """
+        encoding_map = {
+            'bzip2': 'application/x-bzip',
+            'gzip': 'application/gzip',
+            'xz': 'application/x-xz',
+        }
+        self.headers['Content-Type'] = 'application/octet-stream'
+
+        if filename:
+            disposition = 'attachment'
+            try:
+                filename.encode('ascii')
+                file_expr = 'filename="{}"'.format(filename)
+            except UnicodeEncodeError:
+                file_expr = "filename*=utf-8''{}".format(quote(filename))
+            self.headers['Content-Disposition'] = '{}; {}'.format(disposition, file_expr)

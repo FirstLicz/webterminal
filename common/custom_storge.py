@@ -6,6 +6,7 @@ from pathlib import Path
 import logging
 import io
 import os
+import tarfile
 
 logger = logging.getLogger("test" if settings.DEBUG else "default")
 
@@ -28,9 +29,8 @@ class SFTPStorage(Storage):
         return self.sftp.open(filename, mode)
 
     def write(self, name, fl):
-        filename = Path(self.sftp.getcwd(), name)
-        s = self.sftp.stat(filename)
-        size = self.sftp.getfo(filename, fl)
+        s = self.sftp.stat(name)
+        size = self.sftp.getfo(name, fl)
         if s.st_size != size:
             raise IOError(
                 "size mismatch in get!  {} != {}".format(s.st_size, size)
@@ -55,17 +55,15 @@ class SFTPStorage(Storage):
         """
         Delete the specified file from the storage system.
         """
-        filename = Path(self.sftp.getcwd(), name).as_posix()
-        self.sftp.remove(filename)
+        self.sftp.remove(name)
 
     def exists(self, name):
         """
         Return True if a file referenced by the given name already exists in the
         storage system, or False if the name is available for a new file.
         """
-        filename = Path(self.sftp.getcwd(), name).as_posix()
         try:
-            self.sftp.stat(filename)
+            self.sftp.stat(name)
             return True
         except:
             return False
@@ -99,23 +97,21 @@ class SFTPStorage(Storage):
         Return the total size, in bytes, of the file specified by name.
         """
         # sftp_client.stat
-        filename = Path(self.sftp.getcwd(), name).as_posix()
-        return self.sftp.stat(filename).st_size
+        return self.sftp.stat(name).st_size
 
     def url(self, name):
         """
         Return an absolute URL where the file's contents can be accessed
         directly by a Web browser.
         """
-        return Path(self.sftp.getcwd(), name).as_posix()
+        return Path(name).as_posix()
 
     def get_accessed_time(self, name):
         """
         Return the last accessed time (as a datetime) of the file specified by
         name. The datetime will be timezone-aware if USE_TZ=True.
         """
-        filename = Path(self.sftp.getcwd(), name).as_posix()
-        return self.sftp.stat(filename).st_atime
+        return self.sftp.stat(name).st_atime
 
     # def get_created_time(self, name):
     #     """
@@ -129,12 +125,51 @@ class SFTPStorage(Storage):
         Return the last modified time (as a datetime) of the file specified by
         name. The datetime will be timezone-aware if USE_TZ=True.
         """
-        filename = Path(self.sftp.getcwd(), name).as_posix()
-        return self.sftp.stat(filename).st_mtime
+        return self.sftp.stat(name).st_mtime
 
     def stat(self, name):
-        filename = Path(self.sftp.getcwd(), name).as_posix()
-        return self.sftp.lstat(filename)
+        return self.sftp.lstat(name)
+
+    def is_dir(self, name):
+        if stat.S_ISDIR(self.stat(name).st_mode):
+            return True
+        return False
+
+    def get_remote_files(self, remote_path):
+        """
+            获取文件夹列表
+        """
+        for elem in self.sftp.listdir_attr(remote_path):
+            if stat.S_ISDIR(elem.st_mode):
+                yield from self.get_remote_files(Path(remote_path, elem.filename).as_posix())
+            else:
+                yield Path(remote_path, elem.filename).as_posix()
+
+    def download_folder(self, remote_path, local_path):
+        try:
+            for elem in self.get_remote_files(remote_path):
+                target_dir = Path(local_path, elem[1:])  # 去除根 目录 / 的影响
+                if not target_dir.parent.is_dir():
+                    os.makedirs(target_dir.parent.as_posix())
+                self.sftp.get(elem, target_dir.as_posix())
+            path = Path(local_path, remote_path[1:]).as_posix()
+            logger.info(f"tarfile path = {path}")
+            return self.tarfile(path)
+        except:
+            return
+
+    def tarfile(self, path):
+        # tar.filename.gz
+        name = Path(path).name
+        target_path = Path(path).parent
+        target_gz_file = Path(target_path.as_posix(), f"{name}.tar.gz")
+        t = tarfile.open(target_gz_file.as_posix(), "w:gz")
+        # 使用 pathlib
+        for file in Path(path).rglob("*.*"):
+            logger.debug(f"arcname = {Path(name, file.name).as_posix()}")
+            t.add(file.as_posix(), arcname=Path(name, file.name).as_posix())
+        t.close()
+        return target_gz_file.as_posix()
 
 
 class CustomSFTPFile:

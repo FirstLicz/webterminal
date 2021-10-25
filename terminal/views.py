@@ -10,9 +10,10 @@ import uuid
 import logging
 import io
 import tempfile
+import os
 
 from common.custom_storge import SFTPStorage
-from common.utils import SFTPFileResponse
+from common.utils import SFTPFileResponse, StreamingFileResponse
 
 logger = logging.getLogger("test" if settings.DEBUG else "default")
 
@@ -100,14 +101,36 @@ class TerminalSftp(View):
     def sftp_storage(self, token, cmd, path, name):
         storage = SFTPStorage(token)
         if cmd == "download":
-            # 下载，直接退出相应
-            file = io.BytesIO()
-            storage.write(name, file)
-            file.seek(0)
-            # file = open(r'F:\bwd_workspace\gitspace\github\personal\webterminal\terminal\urls.py', 'rb')
-            # name = "urls.py"
-            response = SFTPFileResponse(file, filename=name)
-            return response
+            filename = Path(path, name).as_posix()
+            is_dir = storage.is_dir(filename)
+            logger.info(f"download filename = {filename} is_dir = {is_dir}")
+            if is_dir:
+                # 目录下载, 临时目录
+                local_path = Path(settings.MEDIA_ROOT, token, "_DOWNTMP")
+                if not local_path.is_dir():
+                    os.makedirs(local_path.as_posix())
+                tarfile = storage.download_folder(filename, local_path.as_posix())
+                logger.info(f"download folder tarfile = {tarfile}")
+                # 删除本地文件夹
+                fn = open(tarfile, 'rb')
+                def file_iterator(fn, chunk_size=4096):
+                    while True:
+                        c = fn.read(chunk_size)
+                        if c:
+                            yield c
+                        else:
+                            break
+                response = StreamingFileResponse(file_iterator(fn), filename=Path(tarfile).name)
+                return response
+            else:
+                # 下载，直接退出相应
+                file = io.BytesIO()
+                storage.write(filename, file)
+                file.seek(0)
+                # file = open(r'F:\bwd_workspace\gitspace\github\personal\webterminal\terminal\urls.py', 'rb')
+                # name = "urls.py"
+                response = SFTPFileResponse(file, filename=name)
+                return response
         elif cmd == "upload":
             pass
         dirs, files = storage.listdir(path)

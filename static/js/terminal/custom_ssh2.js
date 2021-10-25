@@ -127,12 +127,13 @@ function download() {
     // 支持批量下载
     var path = get_path();
     console.log("path = " + path)
-    // 处理目录 列表
-    $(":checkbox[name='checkBoxDirs']:checked").each(function () {
-
-    })
     // 处理文件列表
     $(":checkbox[name='checkBoxFiles']:checked").each(function () {
+        console.log("download filename = " + $(this).val())
+        request_get(path, $(this).val())
+    })
+    // 处理目录 列表
+    $(":checkbox[name='checkBoxDirs']:checked").each(function () {
         console.log("download filename = " + $(this).val())
         request_get(path, $(this).val())
     })
