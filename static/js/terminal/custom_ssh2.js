@@ -106,7 +106,7 @@ function request_get(path, name) {
         $.ajax({
             url: window.global_url,
             data: {
-                cmd: "download",
+                cmd: "upload",
                 path: path,
                 name: name
             },
@@ -144,5 +144,32 @@ function upload(path) {
     // 上传文件
     console.log("path = " + path)
     $('ul.qq-upload-list-selector').html("")
+    // 删除多余div
+    $("#fine-uploader").html("")
     $("#fine-uploader").show()
+    let uploader = new qq.FineUploader({
+        multiple: true,
+        element: document.getElementById('fine-uploader'),
+        request: {
+            endpoint: window.global_url,
+            params: {
+                cmd: "upload",
+                path: get_path(),
+                csrfmiddlewaretoken: $(":input[name='csrfmiddlewaretoken']").val()
+            }
+        },
+        deleteFile: {
+            enabled: true,
+            endpoint: '/uploads'
+        },
+        retry: {
+            enableAuto: false
+        },
+        text: {
+            formatProgress: "{percent}% of {total_size}",
+            failUpload: "上传失败",
+            waitingForResponse: "Processing...",
+            paused: "暂停"
+        }
+    });
 }

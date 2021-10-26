@@ -37,6 +37,10 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
         # self.channel_name = query_param.get("room_id")    # 无效
         # 增加到异步
         # 分组添加，使用 channel_name
+        room_id = query_param.get('room_id')
+        logger.info(f"room_id = {room_id}")
+        pubsub_channels = self.get_pubsub().pubsub_channels()
+        logger.info(f"pubsub_channels = {pubsub_channels}")
         await self.channel_layer.group_add(
             query_param.get("room_id"),
             self.channel_name,

@@ -171,4 +171,11 @@ class TerminalSftp(View):
             })
 
     def post(self, request, token):
-        pass
+        path = request.POST.get('path', "/")
+        cmd = request.POST.get('cmd', "ls")
+        option = request.POST.get('option', "sftp")
+        name = request.POST.get("name", "")
+        logger.info(f"token = {token}, param = {path}, option = {option}, name = {name}")
+        logger.info(f"files = {request.FILES}")
+        for file in request.FILES.get("qqfile"):
+            logger.info(f"filename = {file}")

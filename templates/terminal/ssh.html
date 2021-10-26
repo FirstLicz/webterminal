@@ -171,8 +171,10 @@
         </dialog>
     </div>
 </script>
+{% csrf_token %}
 <script src="{% static 'js/terminal/custom_ssh2.js' %}"></script>
 <script>
+    // var csrf_token = "{% csrf_token %}";
     var session_id = "{{ session_id }}"; // 当前会话ID
     var global_url = "/terminal/sftp/{{ session_id }}/";
     var load_flag = true;
@@ -306,26 +308,7 @@
             console.log(event)
         }
     });
-    var uploader = new qq.FineUploader({
-        debug: true,
-        element: document.getElementById('fine-uploader'),
-        request: {
-            endpoint: '/uploads'
-        },
-        deleteFile: {
-            enabled: true,
-            endpoint: '/uploads'
-        },
-        retry: {
-            enableAuto: false
-        },
-        text: {
-            formatProgress: "{percent}% of {total_size}",
-            failUpload: "上传失败",
-            waitingForResponse: "Processing...",
-            paused: "暂停"
-        }
-    });
+
 </script>
 </body>
 </html>
