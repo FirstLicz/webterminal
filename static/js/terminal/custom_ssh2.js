@@ -79,6 +79,7 @@ function command(cmd) {
 function request_post() {
     // 获取文件对象
 
+
     $.ajax({
         url: window.global_url,
 
@@ -141,4 +142,7 @@ function download() {
 
 function upload(path) {
     // 上传文件
+    console.log("path = " + path)
+    $('ul.qq-upload-list-selector').html("")
+    $("#fine-uploader").show()
 }

@@ -70,3 +70,10 @@
 > 
 > 4A V2.3版本需要实现
 > 
+
+## 文件上传 、下载  
+> 1. npm i js-uploader -S  上传插件
+>
+
+## web Ui dialog 
+> 1.npm i sweetalert2 
