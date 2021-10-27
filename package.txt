@@ -1,0 +1,8 @@
+Django
+channels
+pyguacamole
+paramiko
+pycryptodomex
+pysqlite3-binary
+channels_redis
+redis

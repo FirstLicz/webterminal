@@ -59,7 +59,7 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
         )
 
     def get_pubsub(self):
-        redis_instance = redis.Redis(host="127.0.0.1")
+        redis_instance = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
         return redis_instance
 
     # 数据库 访问
@@ -168,7 +168,7 @@ class AsyncTerminalConsumerMonitor(AsyncWebsocketConsumer):
             await self.accept(False)
 
     def get_pubsub(self):
-        redis_instance = redis.Redis(host="127.0.0.1")
+        redis_instance = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
         return redis_instance
 
     async def disconnect(self, code):

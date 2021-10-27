@@ -82,3 +82,18 @@
 ## docker 部署
 > 1. docker run -d --privileged=true --name centos7_terminal -p 8000:8000 -v   F:\bwd_workspace\gitspace\github\personal\webterminal:/app/webterminal -p 8090:8090   centos:7.6.1810 /usr/sbin/init
 > 
+>
+>
+## 加密包
+> 1. pip install pycryptodomex
+>
+>
+## Centos7 python3.8 sqlite需要调整
+  pip3 install pysqlite3-binary  
+  vi /usr/local/python3/lib/python3.8/site-packages/django/db/backends/sqlite3/base.py
+```text
+# 修改内容
+# from sqlite3 import dbapi2 as Database (注释掉这段)
+from pysqlite3 import dbapi2 as Database # 启用pysqlite3
+# :wq 保存即可
+```
