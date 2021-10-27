@@ -142,7 +142,22 @@ function download() {
 
 function upload(path) {
     // 上传文件
+    /*
+<div id="fine-uploader" style="width: 40vw; display: none;z-index: 3 !important; position: fixed; left: 30%; top: 15%"
+     onblur="this.hide()">
+</div>
+*/
+
     console.log("path = " + path)
+    Swal.fire({
+        position: "center",
+        html:"<div id=\"fine-uploader\" style=\"width: 40vw; display: none;z-index: 3 !important; margin-left: " + window.innerWidth * 0.02 + "px;\"\n" +
+            "     onblur=\"this.hide()\">\n" +
+            "</div>",
+        showConfirmButton: false,
+        width: window.innerWidth * 0.5,
+    })
+
     $('ul.qq-upload-list-selector').html("")
     // 删除多余div
     $("#fine-uploader").html("")
