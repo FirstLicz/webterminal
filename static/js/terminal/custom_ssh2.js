@@ -87,10 +87,32 @@ function request_post() {
 }
 
 function request_get(path, name) {
+    /*let second = 0
+    let timerInterval
+    Swal.fire({
+        title: '正在下载中...',
+        html: '用时<b></b>秒',
+        timerProgressBar: true,
+        didOpen: () => {
+            Swal.showLoading()
+            const b = Swal.getHtmlContainer().querySelector('b')
+            timerInterval = setInterval(() => {
+                second += 1;
+                b.textContent = second
+            }, 1000)
+        },
+        willClose: () => {
+            clearInterval(timerInterval)
+        }
+    }).then((result) => {
+        if (result.dismiss === Swal.DismissReason.timer) {
+            console.log('I was closed by the timer')
+        }
+    })*/
     // 获取文件对象
     if (window.download_to_local) {
         // 可选地，上面的请求可以这样做
-        var iframe = window.document.createElement("iframe");
+        /*var iframe = window.document.createElement("iframe");
         iframe.style.display = "none"; // 防止影响页面
         iframe.style.height = 0; // 防止影响页面
         iframe.src = window.global_url + "?" + jQuery.param({
@@ -101,12 +123,20 @@ function request_get(path, name) {
         iframe.onload = function () {
             this.parentNode.removeChild(this);
         }
-        window.document.body.appendChild(iframe); // 这一行必须，iframe挂在到dom树上才会发请求
+        iframe.onloadstart = function (){
+            console.log("onloadstart")
+        }
+        window.document.body.appendChild(iframe); // 这一行必须，iframe挂在到dom树上才会发请求 */
+        window.open(window.global_url + "?" + jQuery.param({
+            cmd: "download",
+            path: path,
+            name: name
+        }))
     } else {
         $.ajax({
             url: window.global_url,
             data: {
-                cmd: "upload",
+                cmd: "download",
                 path: path,
                 name: name
             },
@@ -191,7 +221,7 @@ function upload(path) {
             onComplete: function (id, fileName, responseJSON) {         //上传完成后
                 $('li[qq-file-id="' + id + '"]>span:last')[0].innerHTML = "成功"
                 console.log("responseJSON", responseJSON);
-                window.load_file_list(responseJSON.files, get_path())
+                window.load_file_list(responseJSON.files, path)
             }
         },
     });
