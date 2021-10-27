@@ -191,6 +191,7 @@ function upload(path) {
             onComplete: function (id, fileName, responseJSON) {         //上传完成后
                 $('li[qq-file-id="' + id + '"]>span:last')[0].innerHTML = "成功"
                 console.log("responseJSON", responseJSON);
+                window.load_file_list(responseJSON.files, get_path())
             }
         },
     });

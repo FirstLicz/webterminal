@@ -212,33 +212,39 @@
                     _path = path.slice(0, path.length -1)
                 }
                 console.log("_path = " + _path)
-                for (var i = 0; i < files.length; i++) {
-                    if (files[i].mime === "directory") {
-                        //console.log(item.hash);
-                        $("#scroll_id").append('<div>\n' +
-                            '                    <label class="checkbox inline font-size"\n ondblclick="file_list(\'' + _path + '/' + files[i].name + '\')\"' +
-                            '                           style="float: left; overflow: hidden; white-space: nowrap;width: 75%;text-overflow: ellipsis;">\n' +
-                            '                        <input type="checkbox" name="checkBoxDirs" class="file_elem" style="vertical-align: middle;" value="' + files[i].name + '">\n' + folder_tag + "&nbsp;" + files[i].name +
-                            '                    </label>\n' +
-                            '                    <label class="checkbox inline font-size" style="float: right; width: 25%; text-align: right">\n' +
-                            '                        -\n' +
-                            '                    </label>\n' +
-                            '                </div>')
-
-                    } else {
-                        $("#scroll_id").append('<div>\n' +
-                            '                    <label class="checkbox inline font-size"\n' +
-                            '                           style="float: left; overflow: hidden; white-space: nowrap;width: 75%;text-overflow: ellipsis;">\n' +
-                            '                        <input type="checkbox" name="checkBoxFiles" class="file_elem" style="vertical-align: middle;" value="' + files[i].name + '">\n' + file_tag + "&nbsp;" + files[i].name +
-                            '                    </label>\n' +
-                            '                    <label class="checkbox inline font-size" style="float: right; width: 25%; text-align: right">\n' + diskSize(files[i].size) +
-                            '                    </label>\n' +
-                            '                </div>')
-                    }
-                }
+                load_file_list(files, _path)
             }
         })
     }
+
+    function load_file_list(files, _path) {
+        file_list_scroll.html("")
+        for (var i = 0; i < files.length; i++) {
+            if (files[i].mime === "directory") {
+                //console.log(item.hash);
+                $("#scroll_id").append('<div>\n' +
+                    '                    <label class="checkbox inline font-size"\n ondblclick="file_list(\'' + _path + '/' + files[i].name + '\')\"' +
+                    '                           style="float: left; overflow: hidden; white-space: nowrap;width: 75%;text-overflow: ellipsis;">\n' +
+                    '                        <input type="checkbox" name="checkBoxDirs" class="file_elem" style="vertical-align: middle;" value="' + files[i].name + '">\n' + folder_tag + "&nbsp;" + files[i].name +
+                    '                    </label>\n' +
+                    '                    <label class="checkbox inline font-size" style="float: right; width: 25%; text-align: right">\n' +
+                    '                        -\n' +
+                    '                    </label>\n' +
+                    '                </div>')
+
+            } else {
+                $("#scroll_id").append('<div>\n' +
+                    '                    <label class="checkbox inline font-size"\n' +
+                    '                           style="float: left; overflow: hidden; white-space: nowrap;width: 75%;text-overflow: ellipsis;">\n' +
+                    '                        <input type="checkbox" name="checkBoxFiles" class="file_elem" style="vertical-align: middle;" value="' + files[i].name + '">\n' + file_tag + "&nbsp;" + files[i].name +
+                    '                    </label>\n' +
+                    '                    <label class="checkbox inline font-size" style="float: right; width: 25%; text-align: right">\n' + diskSize(files[i].size) +
+                    '                    </label>\n' +
+                    '                </div>')
+            }
+        }
+    }
+
 
     $(function () {
         var term = new Terminal({

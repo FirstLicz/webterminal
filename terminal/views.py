@@ -137,13 +137,22 @@ class TerminalSftp(View):
                 return response
         elif cmd == "upload":
             # 支持多文件上传
-            for f in name:
-                target_path = Path(settings.MEDIA_ROOT, path[1:])
-                if not target_path.is_dir():
-                    os.makedirs(target_path.as_posix())
-                with open(Path(target_path,  f.name).as_posix(), 'wb+') as destination:
-                    for chunk in f.chunks():
-                        destination.write(chunk)
+            # for f in name:    # 上传到本地目录
+            #     target_path = Path(settings.MEDIA_ROOT, path[1:])
+            #     if not target_path.is_dir():
+            #         os.makedirs(target_path.as_posix())
+            #     print(f.__dict__)
+            #     with open(Path(target_path,  f.name).as_posix(), 'wb+') as destination:
+            #         for chunk in f.chunks():
+            #             destination.write(chunk)
+            # 上传到 sftp
+            try:
+                storage.save(path, name)
+            except:
+                return JsonResponse({
+                    "success": False,  # 返回状态
+                    "message": "上传失败，内部错误"
+                })
         dirs, files = storage.listdir(path)
         file_list = self.response_files(storage, files, dirs)
         return JsonResponse({

@@ -36,17 +36,23 @@ class SFTPStorage(Storage):
                 "size mismatch in get!  {} != {}".format(s.st_size, size)
             )
 
-    def _save(self, name, **kwargs):
-        pass
+    def _save(self, files, path):
+        """
+            保存到 remote Path
+        """
+        for file in files:
+            file_size = file.size
+            remote_path = Path(path, file.name).as_posix()
+            logger.info(f"remote_path = {remote_path}")
+            self.sftp.putfo(file, remote_path, file_size, None, True)
 
-    # 本地存储，需要重写
-    # def path(self, name):
-    #     """
-    #     Return a local filesystem path where the file can be retrieved using
-    #     Python's built-in open() function. Storage systems that can't be
-    #     accessed using open() should *not* implement this method.
-    #     """
-    #     raise NotImplementedError("This backend doesn't support absolute paths.")
+    def save(self, name, content, max_length=None):
+        """
+            保存到本地目录
+            name: remote path
+            content: files => io.BytesIO object
+        """
+        return self._save(content, name)
 
     # The following methods form the public API for storage systems, but with
     # no default implementations. Subclasses must implement *all* of these.
@@ -191,3 +197,4 @@ class CustomSFTPFile:
         else:
             self.storage.write(self.filename, self.file)
             self.file.seek(0)
+
