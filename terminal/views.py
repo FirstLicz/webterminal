@@ -99,6 +99,10 @@ class TerminalSftp(View):
         return result_list
 
     def sftp_storage(self, token, cmd, path, name):
+        """
+            name: GET method 是target path name
+                  POST method 是 files
+        """
         storage = SFTPStorage(token)
         if cmd == "download":
             filename = Path(path, name).as_posix()
@@ -132,12 +136,20 @@ class TerminalSftp(View):
                 response = SFTPFileResponse(file, filename=name)
                 return response
         elif cmd == "upload":
-            pass
+            # 支持多文件上传
+            for f in name:
+                target_path = Path(settings.MEDIA_ROOT, path[1:])
+                if not target_path.is_dir():
+                    os.makedirs(target_path.as_posix())
+                with open(Path(target_path,  f.name).as_posix(), 'wb+') as destination:
+                    for chunk in f.chunks():
+                        destination.write(chunk)
         dirs, files = storage.listdir(path)
         file_list = self.response_files(storage, files, dirs)
         return JsonResponse({
             "cwd": path,
-            "files": file_list
+            "files": file_list,
+            "success": True     # 返回状态
         })
 
     def ftp_storage(self):
@@ -174,8 +186,9 @@ class TerminalSftp(View):
         path = request.POST.get('path', "/")
         cmd = request.POST.get('cmd', "ls")
         option = request.POST.get('option', "sftp")
-        name = request.POST.get("name", "")
-        logger.info(f"token = {token}, param = {path}, option = {option}, name = {name}")
+        logger.info(f"token = {token}, param = {path}, option = {option}")
         logger.info(f"files = {request.FILES}")
-        for file in request.FILES.get("qqfile"):
-            logger.info(f"filename = {file}")
+        logger.info(f"filename = {request.FILES.getlist('qqfile')}")
+        # 上传到 sftp
+        if option == "sftp":
+            return self.sftp_storage(token, cmd, path, request.FILES.getlist('qqfile'))

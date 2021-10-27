@@ -155,6 +155,7 @@ function upload(path) {
             params: {
                 cmd: "upload",
                 path: get_path(),
+                option: 'sftp',
                 csrfmiddlewaretoken: $(":input[name='csrfmiddlewaretoken']").val()
             }
         },
@@ -170,6 +171,12 @@ function upload(path) {
             failUpload: "上传失败",
             waitingForResponse: "Processing...",
             paused: "暂停"
-        }
+        },
+        callbacks: {
+            onComplete: function (id, fileName, responseJSON) {         //上传完成后
+                $('li[qq-file-id="' + id + '"]>span:last')[0].innerHTML = "成功"
+                console.log("responseJSON", responseJSON);
+            }
+        },
     });
 }
