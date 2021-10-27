@@ -77,3 +77,8 @@
 
 ## web Ui dialog 
 > 1.npm i sweetalert2 
+>
+
+## docker 部署
+> 1. docker run -d --privileged=true --name centos7_terminal -p 8000:8000 -v   F:\bwd_workspace\gitspace\github\personal\webterminal:/app/webterminal -p 8090:8090   centos:7.6.1810 /usr/sbin/init
+> 
