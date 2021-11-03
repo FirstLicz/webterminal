@@ -3,7 +3,10 @@
 2. npm i xterm-addon-attach -s
 3. npm i xterm-addon-fit -s
 4. npm i xterm-addon-search -s
-5. npm i xterm-addon-web-links -s
+5. npm i xterm-addon-web-links -s  
+
+####快速使用 xterm.js
+pip install [pyxtermjs](https://pypi.org/project/pyxtermjs/#description)
 
 > ### 操作记录，终端视频播放插件 [asciinema-player](https://github.com/asciinema/asciinema-player)
 > 1. node.js 安装 npm install asciinema-player

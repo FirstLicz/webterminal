@@ -13,7 +13,7 @@ RUN yum install gcc-c++ wget make libffi-devel zlib-devel bzip2-devel openssl-de
     && wget https://www.python.org/ftp/python/3.6.13/Python-3.6.13.tar.xz && tar -xvf Python-3.6.13.tar.xz \
     && cd Python-3.6.13 && mkdir /usr/local/python3 && ./configure --prefix=/usr/local/python3 --enable-shared \
     && make && make install && ln -s /usr/local/python3/bin/python3 /usr/bin/python3 \
-    && ln -s /usr/local/python3/bin/pip3 /usr/bin/pip3 && cp /usr/local/python3/lib/libpython3.6.so.1.0 /usr/lib64/ \
+    && ln -s /usr/local/python3/bin/pip3 /usr/bin/pip3 && cp /usr/local/python3/lib/libpython3.6m.so.1.0 /usr/lib64/ \
     && cd /app/ && rm -rf Python-3.6.13* && pip3 config set global.index-url http://mirrors.aliyun.com/pypi/simple/ \
     && pip3 config set install.trusted-host mirrors.aliyun.com && mkdir -p /usr/local/sqlite && cd /usr/local/sqlite \
     && wget https://www.sqlite.org/2021/sqlite-autoconf-3360000.tar.gz --no-check-certificate \

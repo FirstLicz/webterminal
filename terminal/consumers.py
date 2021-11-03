@@ -90,7 +90,9 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
                         ssh.connect(hostname=con.server, username=con.username,
                                     password=AesEncrypt().decrypt(con.password),
                                     port=con.port)
-                        channel = ssh.invoke_shell(width=width, height=height)
+                        # 真实高度, windows 、 字符数量
+                        channel = ssh.invoke_shell(width=(width // 9), height=(height // 17),
+                                                   width_pixels=width, height_pixels=height)
                         shell = ShellHandler(
                             channel=channel, channel_name=self.channel_name,
                             room_id=query_param.get("room_id"),
@@ -98,7 +100,10 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
                             extra_params={"ssh": ssh, "width": width, "height": height}
                         )
                         # 根据操作系统 设定 使用
-                        shell.windows_shell()
+                        if platform.system() == "Linux":
+                            shell.posix_shell()
+                        elif platform.system() == "Windows":
+                            shell.windows_shell()
                         # 把会话 存储到 全局管理 列表中
                         settings.TERMINAL_SESSION_DICT[session_id] = shell
                     except socket.timeout:

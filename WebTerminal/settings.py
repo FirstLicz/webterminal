@@ -226,16 +226,24 @@ LOGGING = {
 }
 
 # 缓存配置
-# CACHES = {
-#     "default": {
-#         "BACKEND": "django_redis.cache.RedisCache",
-#         "LOCATION": "redis://127.0.0.1:6379/1",
-#         "OPTIONS": {
-#             "CONNECTION_POOL_KWARGS": {"max_connections": 20},
-#             "PASSWORD": "password"
-#         }
-#     }
-# }
+CACHES = {
+    # "default": {
+    #     "BACKEND": "django_redis.cache.RedisCache",
+    #     "LOCATION": "redis://127.0.0.1:6379/1",
+    #     "OPTIONS": {
+    #         "CONNECTION_POOL_KWARGS": {"max_connections": 20},
+    #         "PASSWORD": "password"
+    #     }
+    # }
+    'default': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': Path(BASE_DIR, 'django_cache').as_posix(),
+        # 'TIMEOUT': 60,
+        'OPTIONS': {
+            'MAX_ENTRIES': 2000
+        }
+    }
+}
 
 # 全局变量控制 websocket 中线程对象
 TERMINAL_SESSION_DICT = {}
