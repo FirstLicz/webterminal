@@ -5,6 +5,7 @@ import threading
 import sys
 from paramiko.py3compat import u
 from datetime import datetime, timedelta
+from paramiko import SSHClient, SSHException, AutoAddPolicy
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import os
@@ -35,22 +36,18 @@ zmodemcancel = b'\x18\x18\x18\x18\x18\x08\x08\x08\x08\x08'
 
 class ShellHandler:
 
-    def __init__(self, channel: Channel = None, width=800, height=600, channel_name=None, extra_params: dict = None,
-                 room_id: str = None):
-        if channel:
-            self.channel = channel
-            self.ssh = extra_params["ssh"]
-        else:
-            self.ssh = paramiko.SSHClient()
-            self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            try:
-                self.ssh.connect(hostname="192.168.1.83", username="root", password="bwda123!@#", port=22)
-            except socket.timeout:
-                print(f"connect 192.168.1.83 failed")
-            self.channel = self.ssh.invoke_shell(width=width, height=height)
+    def __init__(self, channel_name=None, room_id: str = None):
+        self.ssh = paramiko.SSHClient()
+        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        self.channel = None
         self.channel_name = channel_name
-        self.extra_params = extra_params
+        self.extra_params = dict()
         self.room_id = room_id
+
+    def connect(self, hostname=None, username=None, password=None, port=None):
+        # ssh client
+        self.ssh.connect(hostname=hostname, username=username, password=password, port=port)
+        self.channel = self.ssh.invoke_shell()
 
     def __del__(self):
         self.ssh.close()
@@ -82,6 +79,12 @@ class ShellHandler:
         display = LinuxInteractiveThread(channel=self.channel, channel_name=self.channel_name, room_id=self.room_id,
                                          extra_params=self.extra_params)
         display.start()
+
+    def resize_terminal(self, width=80, height=24, width_pixels=0, height_pixels=0):
+        self.channel.resize_pty(width=width, height=height, width_pixels=width_pixels, height_pixels=height_pixels)
+
+    def receive(self, text_data=None, bytes_data=None):
+        pass
 
 
 class InteractiveThread(threading.Thread):

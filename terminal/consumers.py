@@ -3,7 +3,7 @@ from channels.db import database_sync_to_async
 from channels_redis.core import RedisChannelLayer
 import json
 import redis
-from paramiko import SSHClient, SSHException, AutoAddPolicy
+
 import socket
 import logging
 import platform
@@ -30,9 +30,7 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         session_id = self.scope['url_route']['kwargs']['session_id']
         query_param = QueryDict(self.scope.get('query_string'))
-        logger.info(f"query_param =  {query_param}")
-        settings.TERMINAL_SESSION_DICT[session_id] = None
-        logger.debug(f"session_id = {session_id}")
+        logger.info(f"query_param =  {query_param} session_id = {session_id}")
         # 修改 channel_name
         # self.channel_name = query_param.get("room_id")    # 无效
         # 增加到异步
@@ -46,6 +44,18 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
             self.channel_name,
         )
         await self.accept()
+        con = await self.get_connect()
+        # 真实高度, windows 、 字符数量
+        self.shell = ShellHandler(
+            channel_name=self.channel_name,
+            room_id=query_param.get("room_id"),
+            # channel=channel, channel_name=query_param.get("room_id"),
+        )
+        logger.info(f"shell = {self.shell}")
+        # 把会话 存储到 全局管理 列表中
+        settings.TERMINAL_SESSION_DICT[session_id] = self.shell
+        self.shell.connect(hostname=con.server, username=con.username, password=AesEncrypt().decrypt(con.password),
+                           port=con.port)
 
     async def disconnect(self, code):
         query_param = QueryDict(self.scope.get('query_string'))
@@ -70,7 +80,7 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data=None, bytes_data=None):
         session_id = self.scope['url_route']['kwargs']['session_id']
-        logger.debug(f"text_data = {text_data}, type = {type(text_data)}")
+        logger.debug(f"text_data = {text_data}, type = {type(text_data)} session_id = {session_id}")
         # send message to room group
         query_param = QueryDict(self.scope.get('query_string'))
         room_id = query_param.get('room_id')
@@ -80,46 +90,24 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
             try:
                 text_data_json = json.loads(text_data)
                 if len(text_data_json) == 3:
-                    ip, width, height = text_data_json
-                    logger.debug(f"ip = {ip} width = {width} height = {height}")
-                    # ssh client
-                    ssh = SSHClient()
-                    try:
-                        con = await self.get_connect()
-                        ssh.set_missing_host_key_policy(AutoAddPolicy())
-                        ssh.connect(hostname=con.server, username=con.username,
-                                    password=AesEncrypt().decrypt(con.password),
-                                    port=con.port)
-                        # 真实高度, windows 、 字符数量
-                        channel = ssh.invoke_shell(width=(width // 9), height=(height // 17),
-                                                   width_pixels=width, height_pixels=height)
-                        shell = ShellHandler(
-                            channel=channel, channel_name=self.channel_name,
-                            room_id=query_param.get("room_id"),
-                            # channel=channel, channel_name=query_param.get("room_id"),
-                            extra_params={"ssh": ssh, "width": width, "height": height}
-                        )
+                    cmd, width, height = text_data_json
+                    logger.debug(f"ip = {cmd} width = {width} height = {height}")
+                    self.shell.resize_terminal(
+                        width_pixels=width, height_pixels=height,
+                        width=(width // 9), height=(height // 17)
+                    )
+                    if cmd == "onopen":
                         # 根据操作系统 设定 使用
+                        self.shell.extra_params['width'] = width
+                        self.shell.extra_params['height'] = height
                         if platform.system() == "Linux":
-                            shell.posix_shell()
+                            self.shell.posix_shell()
                         elif platform.system() == "Windows":
-                            shell.windows_shell()
-                        # 把会话 存储到 全局管理 列表中
-                        settings.TERMINAL_SESSION_DICT[session_id] = shell
-                    except socket.timeout:
-                        await self.send(text_data=json.dumps({
-                            "message": f"\033[1;3;31m Connect to server {con.server} time out\033[0m"
-                        }))
-                        await self.accept(False)
-                    except SSHException as e:
-                        logger.exception(e)
-                    except Exception as e:
-                        logger.exception(e)
-
+                            self.shell.windows_shell()
                 elif len(text_data_json) == 2:
                     method, message = text_data_json
                     print(method, message)
-            except:
+            except Exception as e:
                 self.redis_pubsub.publish(query_param.get("room_id"), text_data)  # 频道
                 # self.redis_pubsub.publish(self.channel_name, text_data)
                 # 群发, 发送至监听

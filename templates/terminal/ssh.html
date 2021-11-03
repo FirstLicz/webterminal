@@ -290,12 +290,13 @@
             file_list_scroll.css({
                 "height": window.innerHeight - file_list_scroll.position().top
             })
+            ws.send(JSON.stringify(["resize", terminal.offsetWidth, terminal.offsetHeight])); // 将消息发出
         }
         // term.write('Hello from \x1B[1;3;31mxterm.js\x1B[0m $ ')
         ws.onopen = function () {
             // 当 websocket 创建成功时，触发事件
             console.log("open websocket")
-            ws.send(JSON.stringify(["ip", terminal.offsetWidth, terminal.offsetHeight])); // 将消息发出
+            ws.send(JSON.stringify(["onopen", terminal.offsetWidth, terminal.offsetHeight])); // 将消息发出
         }
         ws.onmessage = function (event) {
             // console.log(event.data)
