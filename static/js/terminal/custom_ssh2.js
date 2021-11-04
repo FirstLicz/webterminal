@@ -226,3 +226,129 @@ function upload(path) {
         },
     });
 }
+
+/*
+* rz 命令
+* sz 命令
+* */
+
+function updateProgress(xfer) {
+    let detail = xfer.get_details();
+    let name = detail.name;
+    let total = detail.size;
+    let percent;
+    if (total === 0) {
+        percent = 100
+    } else {
+        percent = Math.round(xfer._file_offset / total * 100);
+    }
+
+    term.write("\r" + name + ": " + total + " " + xfer._file_offset + " " + percent + "%    ");
+}
+
+function uploadFile(zsession) {
+    let uploadHtml = "<div>" +
+        "<label class='upload-area' style='width:100%;text-align:center;' for='fupload'>" +
+        "<input id='fupload' name='fupload' type='file' style='display:none;' multiple='true'>" +
+        "<i class='fa fa-cloud-upload fa-3x'></i>" +
+        "<br />" +
+        "点击选择文件" +
+        "</label>" +
+        "<br />" +
+        "<span style='margin-left:5px !important;' id='fileList'></span>" +
+        "</div><div class='clearfix'></div>";
+
+    let upload_dialog = bootbox.dialog({
+        message: uploadHtml,
+        title: "上传文件",
+        buttons: {
+            cancel: {
+                label: '关闭',
+                className: 'btn-default',
+                callback: function (res) {
+                    try {
+                        // zsession 每 5s 发送一个 ZACK 包，5s 后会出现提示最后一个包是 ”ZACK“ 无法正常关闭
+                        // 这里直接设置 _last_header_name 为 ZRINIT，就可以强制关闭了
+                        zsession._last_header_name = "ZRINIT";
+                        zsession.close();
+                    } catch (e) {
+                        console.log(e);
+                    }
+                }
+            },
+        },
+        closeButton: false,
+    });
+
+    function hideModal() {
+        upload_dialog.modal('hide');
+    }
+
+    let file_el = document.getElementById("fupload");
+    console.log(file_el)
+    return new Promise((res) => {
+        file_el.onchange = function (e) {
+            console.log("file onchange")
+            let files_obj = file_el.files;
+            hideModal();
+            Zmodem.Browser.send_files(zsession, files_obj, {
+                on_offer_response(obj, xfer) {
+                    console.log("obj = " + obj)
+                    console.log("xfer = " + xfer)
+                    if (xfer) {
+                        // term.write("\r\n");
+                    } else {
+                        // term.write("\r\n" + obj.name + " was upload skipped");
+                        term.write(obj.name + " was upload skipped\r\n");
+                        //socket.send(JSON.stringify({ type: "ignore", data: utoa("\r\n" + obj.name + " was upload skipped\r\n") }));
+                    }
+                },
+                on_progress(obj, xfer) {
+                    updateProgress(xfer);
+                },
+                on_file_complete(obj) {
+                    //socket.send(JSON.stringify({ type: "ignore", data: utoa("\r\n" + obj.name + " was upload success\r\n") }));
+                    // console.log("COMPLETE", obj);
+                    term.write("\r\n");
+                },
+            }).then(zsession.close.bind(zsession), console.error.bind(console)).then(() => {
+                res();
+                // term.write("\r\n");
+            });
+        };
+    });
+}
+
+function downloadFile(zsession) {
+    zsession.on("offer", function (xfer) {
+        function on_form_submit() {
+            let FILE_BUFFER = [];
+            xfer.on("input", (payload) => {
+                updateProgress(xfer);
+                FILE_BUFFER.push(new Uint8Array(payload));
+            });
+
+            xfer.accept().then(
+                () => {
+                    saveFile(xfer, FILE_BUFFER);
+                    term.write("\r\n");
+                    //socket.send(JSON.stringify({ type: "ignore", data: utoa("\r\n" + xfer.get_details().name + " was download success\r\n") }));
+                },
+                console.error.bind(console)
+            );
+        }
+
+        on_form_submit();
+
+    });
+
+    let promise = new Promise((res) => {
+        zsession.on("session_end", () => {
+            res();
+        });
+    });
+
+    zsession.start();
+    return promise;
+}
+

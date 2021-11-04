@@ -4,6 +4,8 @@ from django.http.response import JsonResponse, FileResponse, StreamingHttpRespon
 from django.conf import settings
 from django.utils.encoding import escape_uri_path
 from wsgiref.util import FileWrapper
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 
 from pathlib import Path
 import uuid
@@ -38,6 +40,19 @@ class WebSShTwoMonitorView(View):
         return render(request, "terminal/ssh2Monitor.html", {
             "session_id": uuid.uuid1().hex,
             "room_id": room_id
+        })
+
+
+class WebSShTwoKillView(View):
+
+    def post(self, request):
+        room_id = request.POST.get("room_id")
+        async_to_sync(get_channel_layer().group_send)(room_id, {
+            "type": "disconnect",
+        })
+        return JsonResponse({
+            "data": {},
+            "code": 0
         })
 
 

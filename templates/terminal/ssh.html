@@ -11,6 +11,8 @@
     <script src="{% static 'plugins/jQuery/jquery-2.2.3.min.js' %}"></script>
     <script src="{% static 'plugins/bootstrap/bootstrap.min.js' %}"></script>
     <script src="{% static 'plugins/fine-uploader/all.fine-uploader.js' %}"></script>
+    <script src="{% static 'plugins/nora-zmodem/zmodem.devel.js' %}"></script>
+    <script src="{% static 'plugins/bootbox/bootbox.all.min.js' %}"></script>
     <link rel="stylesheet" href="{% static 'plugins/bootstrap/bootstrap.min.css' %}"/>
     <link rel="stylesheet" href="{% static 'plugins/fine-uploader/fine-uploader-new.css' %}"/>
     <link rel="stylesheet" href="{% static 'plugins/sweetalert2/sweetalert2.css' %}"/>
@@ -276,6 +278,33 @@
         term.loadAddon(fitAddon)/**/
         term.open(terminal);
         term.focus()
+
+        let zsentry = new Zmodem.Sentry({
+            to_terminal: function (octets) {
+            },  //i.e. send to the terminal
+
+            on_detect: function (detection) {
+                let zsession = detection.confirm();
+                let promise;
+                console.log("zsession.type = " + zsession.type)
+                if (zsession.type === "receive") {
+                    promise = downloadFile(zsession);
+                }else if (zsession.type === "send"){
+                    promise = uploadFile(zsession);
+                }
+                promise.catch(console.error.bind(console)).then(() => {
+                    //
+                });
+                console.log(promise)
+            },
+
+            on_retract: function () {
+            },
+            sender: function (octets) {
+                console.log(octets)
+                ws.send(new Uint8Array(octets))
+            },
+        });
         // 页面加载好，进行设定
         file_list_scroll.css({
             "height": $("#right_div").height() - file_list_scroll.position().top - 20
@@ -299,11 +328,14 @@
             ws.send(JSON.stringify(["onopen", terminal.offsetWidth, terminal.offsetHeight])); // 将消息发出
         }
         ws.onmessage = function (event) {
-            // console.log(event.data)
+            console.log(event.data)
             if (load_flag) {
                 // 获取文件列表
                 file_list("/", "ls");
                 load_flag = false;
+            }
+            if (typeof (event.data) !== 'string') {
+                zsentry.consume(event.data);
             }
         }
         ws.onclose = function (event) {

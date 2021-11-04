@@ -27,11 +27,11 @@ except ImportError:
     pass
 
 logger = logging.getLogger("default")
-zmodemszstart = b'rz\r**\x18B00000000000000\r\x8a'
-zmodemszend = b'**\x18B0800000000022d\r\x8a'
-zmodemrzstart = b'rz waiting to receive.**\x18B0100000023be50\r\x8a'
-zmodemrzend = b'**\x18B0800000000022d\r\x8a'
-zmodemcancel = b'\x18\x18\x18\x18\x18\x08\x08\x08\x08\x08'
+zmodem_sz_start = b'**B00000000000000'
+zmodem_sz_end = b'OO'
+zmodem_rz_start = b'rz waiting to receive.**\x18B0100000023be50\r\x8a'
+zmodem_rz_end = b'**\x18B0100000023be50\r\x8a\x11'
+zmodem_cancel = b'\x18\x18\x18\x18\x18\x08\x08\x08\x08\x08'
 
 
 class ShellHandler:
@@ -43,6 +43,7 @@ class ShellHandler:
         self.channel_name = channel_name
         self.extra_params = dict()
         self.room_id = room_id
+        self.extra_params['ssh'] = self.ssh
 
     def connect(self, hostname=None, username=None, password=None, port=None):
         # ssh client
@@ -207,6 +208,8 @@ class LinuxInteractiveThread(InteractiveThread):
         # target_file = os.path.join(target_dir, self.channel_name.split(".")[1])   # 默认单通道
         target_file = os.path.join(target_dir, self.channel_name + "_" + uuid.uuid1().hex)  # 团体通道
         f = open(target_file, 'w', encoding="utf8")
+        command = list()
+        zmodem = False
         try:
             f.writelines([json.dumps(first_line), '\n'])
             while self._run_control.isSet():
@@ -214,30 +217,40 @@ class LinuxInteractiveThread(InteractiveThread):
                 r, w, e = select.select([self.channel, ], [], [])
                 if self.channel in r:
                     data = self.channel.recv(4096)
-                    data = u(data)
-                    logger.info(f"recv data = {data}")
+                    logger.info(f"zmodem = {zmodem} recv data = {data}")
                     if not data:
                         break
-                    elif data == "<<<close>>>":
-                        self.channel.close()
-                        if isinstance(ssh_obj, paramiko.SSHClient):
-                            ssh_obj.close()
-                        if thread_ssh2_write and isinstance(thread_ssh2_write, SubscribeWriteThread):
-                            thread_ssh2_write.stop()
-                        break
+                    if zmodem:
+                        if zmodem_rz_end in data or zmodem_sz_end in data:
+                            logger.info(f"zmodem end")
+                            zmodem = False
+                        if zmodem_cancel in data:
+                            zmodem = False
+                        # 单通道发送
+                        async_to_sync(websocket_channel.send)(self.channel_name, {
+                            "type": "terminal_message",
+                            "message": data
+                        })
+                        continue
+                    if zmodem_sz_start in data or zmodem_rz_start in data:
+                        # 单通道发送
+                        logger.info(f"zmodem start")
+                        zmodem = True
+                        async_to_sync(websocket_channel.send)(self.channel_name, {
+                            "type": "terminal_message",
+                            "message": data
+                        })
+                        continue
+                    else:
+                        logger.info(f"common message")
+                        async_to_sync(websocket_channel.group_send)(self.room_id, {
+                            "type": "terminal_message",
+                            "message": u(data)
+                        })
                     # 计算时差、记录内容
                     end_time = time.time()
                     delay = round(end_time - begin_time, 6)
-                    # if len(data) == 1 or data == '\r\n':
-                    #     f.writelines([json.dumps([delay, 'i', data]), '\n'])
-                    # else:
-                    f.writelines([json.dumps([delay, 'o', data]), '\n'])
-                    # 分组 发送
-                    async_to_sync(websocket_channel.group_send)(self.room_id, {
-                        "type": "terminal_message",
-                        "message": u(data)
-                    })
-                    # 单通道发送
+                    f.writelines([json.dumps([delay, 'o', u(data)]), '\n'])
             logger.info(f"thread ID = {thread_ssh2_write.ident}  is alive = {thread_ssh2_write.is_alive()}")
             # 建立 redis 订阅机制, 先有订阅，才能发送
             redis_instance = redis.Redis(host=settings.REDIS_HOST)
@@ -270,6 +283,8 @@ class SubscribeWriteThread(threading.Thread):
         self.extra_params = extra_params
         self.room_id = room_id  # redis 订阅
         self.pubsub.subscribe(self.room_id)
+        self.cmd = ""
+        self.last_cmd = ""
 
     def stop(self):
         self._control.clear()
@@ -280,16 +295,15 @@ class SubscribeWriteThread(threading.Thread):
             if result:
                 logger.debug(f"result = {result}, type = {type(result)}")
                 data = result.get("data")
-                if isinstance(data, str):
-                    if platform.system().lower() == "windows":
-                        if data == "\\r":
-                            data = "\\r\\n"
-                    self.channel.send(data)
-                elif isinstance(data, bytes):
-                    if platform.system().lower() == "windows":
-                        if data == "\\r":
-                            data = "\\r\\n"
-                    self.channel.send(data.decode())
+                if isinstance(data, bytes):
+                    if data == "\r\n" or data == "\r":
+                        self.cmd = ""
+                    else:
+                        self.cmd += data.decode()
+                    try:
+                        self.channel.send(data.decode())
+                    except UnicodeDecodeError:
+                        self.channel.send(data)
                 # self.pubsub.publish(self.channel_name, json.dumps({"message": "test"}))
 
             # time.sleep(0.001)

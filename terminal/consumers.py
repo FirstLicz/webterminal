@@ -80,7 +80,7 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data=None, bytes_data=None):
         session_id = self.scope['url_route']['kwargs']['session_id']
-        logger.debug(f"text_data = {text_data}, type = {type(text_data)} session_id = {session_id}")
+        logger.debug(f"text_data = {text_data}, bytes_data = {bytes_data} session_id = {session_id}")
         # send message to room group
         query_param = QueryDict(self.scope.get('query_string'))
         room_id = query_param.get('room_id')
@@ -104,9 +104,6 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
                             self.shell.posix_shell()
                         elif platform.system() == "Windows":
                             self.shell.windows_shell()
-                elif len(text_data_json) == 2:
-                    method, message = text_data_json
-                    print(method, message)
             except Exception as e:
                 self.redis_pubsub.publish(query_param.get("room_id"), text_data)  # 频道
                 # self.redis_pubsub.publish(self.channel_name, text_data)
@@ -125,7 +122,10 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
         message = event["message"]
         logger.info(f"message = {message}")
         # Send message to websocket
-        await self.send(text_data=message)
+        if isinstance(message, str):
+            await self.send(text_data=message)
+        elif isinstance(message, bytes):
+            await self.send(bytes_data=message)
 
     # 重载 调用方法 修改 channel_name
     # 接收分组消息
