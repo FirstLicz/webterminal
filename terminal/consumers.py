@@ -106,16 +106,9 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
                             self.shell.windows_shell()
             except Exception as e:
                 self.redis_pubsub.publish(query_param.get("room_id"), text_data)  # 频道
-                # self.redis_pubsub.publish(self.channel_name, text_data)
-                # 群发, 发送至监听
-                # send message to room group
-                # await self.channel_layer.group_send(
-                #     room_id,
-                #     {
-                #         "type": "terminal_group_message",
-                #         "message": text_data,
-                #     }
-                # )
+        if bytes_data:
+            # 字节流发送
+            self.shell.websocket_bytes_to_ssh(bytes_data)
 
     # 接收通道消息
     async def terminal_message(self, event):

@@ -864,7 +864,6 @@ Zmodem.Browser = {
 
                 return new Promise( function(res) {
                     var reader = new FileReader();
-                    reader.readAsArrayBuffer(cur_b.obj);
 
                     //This really shouldn’t happen … so let’s
                     //blow up if it does.
@@ -875,17 +874,18 @@ Zmodem.Browser = {
 
                     var piece;
                     reader.onprogress = function reader_onprogress(e) {
+
                         //Some browsers (e.g., Chrome) give partial returns,
                         //while others (e.g., Firefox) don’t.
-                        // 只有文件读取完毕才能取到result值，所以此处无效
                         if (e.target.result) {
                             piece = new Uint8Array(e.target.result, xfer.get_offset())
+
                             _check_aborted(session);
 
                             xfer.send(piece);
 
                             if (options.on_progress) {
-                              options.on_progress(cur_b.obj, xfer, piece);
+                                options.on_progress(cur_b.obj, xfer, piece);
                             }
                         }
                     };
@@ -911,6 +911,8 @@ Zmodem.Browser = {
                             res( promise_callback() );
                         } );
                     };
+
+                    reader.readAsArrayBuffer(cur_b.obj);
                 } );
             } );
         }
@@ -1186,11 +1188,14 @@ Zmodem.Sentry = class ZmodemSentry {
         if (!(input instanceof Array)) {
             input = Array.prototype.slice.call( new Uint8Array(input) );
         }
-
         if (this._zsession) {
             var session_before_consume = this._zsession;
 
-            session_before_consume.consume(input);
+            try {
+                session_before_consume.consume(input);
+            } catch (e) {
+                console.log(e);
+            }
 
             if (session_before_consume.has_ended()) {
                 if (session_before_consume.type === "receive") {
@@ -1373,8 +1378,6 @@ var Zmodem = module.exports;
  * headers and subpackets. The logic here is not unlikely to need tweaking
  * as little edge cases crop up.
  */
-
-Zmodem.DEBUG = false;
 
 Object.assign(
     Zmodem,
@@ -1585,6 +1588,7 @@ Zmodem.Session = class ZmodemSession extends _Eventer {
      * @param {number[]} octets - The input octets.
      */
     consume(octets) {
+
         this._before_consume(octets);
 
         if (this._aborted) throw new Zmodem.Error('already_aborted');
@@ -1657,9 +1661,7 @@ Zmodem.Session = class ZmodemSession extends _Eventer {
         var new_header_and_crc = Zmodem.Header.parse(this._input_buffer);
         if (!new_header_and_crc) return;
 
-        if (Zmodem.DEBUG) {
-            this._log_header( "RECEIVED HEADER", new_header_and_crc[0] );
-        }
+        //console.log("RECEIVED HEADER", new_header_and_crc[0]);
 
         this._consume_header(new_header_and_crc[0]);
 
@@ -1669,14 +1671,10 @@ Zmodem.Session = class ZmodemSession extends _Eventer {
         return new_header_and_crc[0];
     }
 
-    _log_header(label, header) {
-        console.debug(this.type, label, header.NAME, header._bytes4.join());
-    }
-
     _consume_header(new_header) {
         this._on_receive(new_header);
 
-        var handler = this._next_header_handler && this._next_header_handler[ new_header.NAME ];
+        var handler = this._next_header_handler[ new_header.NAME ];
         if (!handler) {
             console.error("Unhandled header!", new_header, this._next_header_handler);
             throw new Zmodem.Error( "Unhandled header: " + new_header.NAME );
@@ -1704,12 +1702,11 @@ Zmodem.Session = class ZmodemSession extends _Eventer {
             //We shouldn’t ever expect to receive an abort. Even if we
             //have sent an abort ourselves, the Sentry should have stopped
             //directing input to this Session object.
-            // if (this._expect_abort) {
+            //if (this._expect_abort) {
             //    return true;
-            // }
-            return true;
+            //}
 
-            // throw new Zmodem.Error("peer_aborted");
+            throw new Zmodem.Error("peer_aborted");
         }
     }
 
@@ -1720,10 +1717,6 @@ Zmodem.Session = class ZmodemSession extends _Eventer {
 
         var bytes_hdr = this._create_header_bytes(args);
 
-        if (Zmodem.DEBUG) {
-            this._log_header( "SENDING HEADER", bytes_hdr[1] );
-        }
-
         this._sender(bytes_hdr[0]);
 
         this._last_sent_header = bytes_hdr[1];
@@ -1732,6 +1725,8 @@ Zmodem.Session = class ZmodemSession extends _Eventer {
     _create_header_bytes(name_and_args) {
 
         var hdr = Zmodem.Header.build.apply( Zmodem.Header, name_and_args );
+
+        //console.log( this.type, "SENDING HEADER", hdr );
 
         var formatter = this._get_header_formatter(name_and_args[0]);
 
@@ -1893,11 +1888,9 @@ Zmodem.Session.Receive = class ZmodemReceiveSession extends Zmodem.Session {
 
         var subpacket = Zmodem.Subpacket[parse_func](this._input_buffer);
 
-        if (subpacket) {
-            if (Zmodem.DEBUG) {
-                console.debug(this.type, "RECEIVED SUBPACKET", subpacket);
-            }
+        //console.log("RECEIVED SUBPACKET", subpacket);
 
+        if (subpacket) {
             this._consume_data(subpacket);
 
             //What state are we in if the subpacket indicates frame end
@@ -1913,6 +1906,7 @@ Zmodem.Session.Receive = class ZmodemReceiveSession extends Zmodem.Session {
 
     _consume_first() {
         if (this._got_ZFIN) {
+
             if (this._input_buffer.length < 2) return;
 
             //if it’s OO, then set this._bytes_after_OO
@@ -1927,7 +1921,7 @@ Zmodem.Session.Receive = class ZmodemReceiveSession extends Zmodem.Session {
                 return;
             }
             else {
-                throw( "PROTOCOL: Only thing after ZFIN should be “OO” (79,79), not: " + this._input_buffer.join() );
+                throw( "PROTOCOL: Only thing after ZFIN should be “OO” (79,79), not: " + array_buf.join() );
             }
         }
 
@@ -2115,23 +2109,11 @@ Zmodem.Session.Receive = class ZmodemReceiveSession extends Zmodem.Session {
 
                     this._next_header_handler = {
                         ZEOF: function on_ZEOF(hdr) {
-
-                            // Do this first to verify the ZEOF.
-                            // This also fires the “file_end” event.
+                            this._next_subpacket_handler = null;
                             this._consume_ZEOF(hdr);
 
-                            this._next_subpacket_handler = null;
-
-                            // We don’t care about this promise.
-                            // Prior to v0.1.8 we did because we called
-                            // resolve_accept() at the resolution of this
-                            // promise, but that was a bad idea and was
-                            // never documented, so 0.1.8 changed it.
-                            this._make_promise_for_between_files();
-
-                            resolve_accept();
-
-                            this._send_ZRINIT();
+                            var next_promise = this._make_promise_for_between_files();
+                            resolve_accept(next_promise);
                         },
                     };
                 },
@@ -2147,16 +2129,6 @@ Zmodem.Session.Receive = class ZmodemReceiveSession extends Zmodem.Session {
         var ret = this._make_promise_for_between_files();
 
         if (this._accepted_offer) {
-            // There’s a race condition where we might attempt to
-            // skip() an in-progress transfer near its end but actually
-            // the skip() will fire after the transfer is complete.
-            // While there might be ways to prevent this, they likely
-            // would require extra work on the part of implementations.
-            //
-            // It seems far simpler just to make this function a no-op
-            // in these cases.
-            if (!this._current_transfer) return;
-
             //For cancel of an in-progress transfer from lsz,
             //it’s necessary to avoid this buffer overflow bug:
             //
@@ -2218,6 +2190,8 @@ Zmodem.Session.Receive = class ZmodemReceiveSession extends Zmodem.Session {
         if (this._file_offset !== header.get_offset()) {
             throw( "ZEOF offset mismatch; unimplemented (local: " + this._file_offset + "; ZEOF: " + header.get_offset() + ")" );
         }
+
+        this._send_ZRINIT();
 
         this._on_file_end();
 
@@ -2334,20 +2308,17 @@ var Transfer_Offer_Mixin = {
  *
  * @mixes Transfer_Offer_Mixin
  */
-class Transfer extends _Eventer {
+class Transfer {
 
     /**
      * Not called directly.
      */
     constructor(file_info, offset, send_func, end_func) {
-        super();
         this._file_info = file_info;
         this._file_offset = offset || 0;
 
         this._send = send_func;
         this._end = end_func;
-
-        this._Add_event("send_progress");
     }
 
     /**
@@ -2751,10 +2722,6 @@ Zmodem.Session.Send = class ZmodemSendSession extends Zmodem.Session {
      * undefined.
      */
     send_offer(params) {
-        if (Zmodem.DEBUG) {
-            console.debug("SENDING OFFER", params);
-        }
-
         if (!params) throw "need file params!";
 
         if (this._sending_file) throw "Already sending file!";
@@ -2764,35 +2731,6 @@ Zmodem.Session.Send = class ZmodemSendSession extends Zmodem.Session {
         this._stop_keepalive();
 
         var sess = this;
-
-        function zrpos_handler_setter_func() {
-            sess._next_header_handler = {
-
-                // The receiver may send ZRPOS in at least two cases:
-                //
-                // 1) A malformed subpacket arrived, so we need to
-                // “rewind” a bit and continue from the receiver’s
-                // last-successful location in the file.
-                //
-                // 2) The receiver hasn’t gotten any data for a bit,
-                // so it sends ZRPOS as a “ping”.
-                //
-                // Case #1 shouldn’t happen since zmodem.js requires a
-                // reliable transport. Case #2, though, can happen due
-                // to either normal network congestion or errors in
-                // implementation. In either case, there’s nothing for
-                // us to do but to ignore the ZRPOS, with an optional
-                // warning.
-                //
-                ZRPOS: function(hdr) {
-                    if (Zmodem.DEBUG) {
-                        console.warn("Mid-transfer ZRPOS … implementation error?");
-                    }
-
-                    zrpos_handler_setter_func();
-                },
-            };
-        };
 
         var doer_func = function() {
 
@@ -2807,18 +2745,14 @@ Zmodem.Session.Send = class ZmodemSendSession extends Zmodem.Session {
                     },
                     ZRPOS: function(hdr) {
                         sess._sending_file = true;
-
-                        zrpos_handler_setter_func();
-
-                        let transfer = new Transfer(
-                          params,
-                          hdr.get_offset(),
-                          sess._send_interim_file_piece.bind(sess),
-                          sess._end_file.bind(sess)
-                      )
-                        this._current_transfer = transfer
-
-                        res(transfer);
+                        res(
+                            new Transfer(
+                                params,
+                                hdr.get_offset(),
+                                sess._send_interim_file_piece.bind(sess),
+                                sess._end_file.bind(sess)
+                            )
+                        );
                     },
                 };
             } );
@@ -2843,11 +2777,6 @@ Zmodem.Session.Send = class ZmodemSendSession extends Zmodem.Session {
         var data_bytes = this._build_subpacket_bytes(data_arr, frameend);
 
         bytes_hdr[0].push.apply( bytes_hdr[0], data_bytes );
-
-        if (Zmodem.DEBUG) {
-            this._log_header( "SENDING HEADER", bytes_hdr[1] );
-            console.debug( this.type, "-- HEADER PAYLOAD:", frameend, data_bytes.length );
-        }
 
         this._sender( bytes_hdr[0] );
 
@@ -2997,7 +2926,7 @@ Zmodem.Session.Send = class ZmodemSendSession extends Zmodem.Session {
 
         //We have to go through at least once in event of an
         //empty buffer, e.g., an empty end_file.
-          while (true) {
+        while (true) {
             var chunk_size = Math.min(obj_offset + MAX_CHUNK_LENGTH, bytes_count) - obj_offset;
 
             var at_end = (chunk_size + obj_offset) >= bytes_count;
@@ -3014,15 +2943,8 @@ Zmodem.Session.Send = class ZmodemSendSession extends Zmodem.Session {
 
             this._file_offset += chunk_size;
             obj_offset += chunk_size;
-            if (this._current_transfer) {
-              this._current_transfer._Happen("send_progress", (obj_offset / bytes_count * 100).toFixed(2));
-          }
 
-            if (obj_offset >= bytes_count) {
-              this._current_transfer._Happen("send_progress", 100.00);
-              this._current_transfer = null;
-              break;
-            }
+            if (obj_offset >= bytes_count) break;
         }
     }
 
@@ -3666,7 +3588,6 @@ const FRAME_CLASS_TYPES = [
 ZFERR is described as “error in reading or writing file”. It’s really
 not a good idea from a security angle for the endpoint to expose this
 information. We should parse this and handle it as ZABORT but never send it.
-
 Likewise with ZFREECNT: the sender shouldn’t ask how much space is left
 on the other box; rather, the receiver should decide what to do with the
 file size as the sender reports it.
