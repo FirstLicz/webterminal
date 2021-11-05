@@ -52,6 +52,7 @@ class ShellHandler:
         self.channel = self.ssh.invoke_shell()
 
     def __del__(self):
+        logger.info(f"self {self} close")
         self.ssh.close()
 
     def windows_shell(self):
@@ -218,62 +219,74 @@ class LinuxInteractiveThread(InteractiveThread):
         zmodemOO = False
         try:
             f.writelines([json.dumps(first_line), '\n'])
+            self.channel.settimeout(0.0)
+            data = None
             while self._run_control.isSet():
                 self._control.wait()  # 为True时立即返回，为False时阻塞直到内部设置为True返回
-                r, w, e = select.select([self.channel], [], [])
-                if self.channel in r:
-                    logger.info(f"zmodem = {zmodem} zmodemOO = {zmodemOO}")
-                    if zmodemOO:
-                        zmodemOO = False
-                        data = self.channel.recv(2)
-                        if not data:
-                            break
-                        if data == b'OO':
-                            async_to_sync(websocket_channel.send)(self.channel_name, {
-                                "type": "terminal_message",
-                                "message": data
-                            })
-                            continue
+                try:
+                    r, w, e = select.select([self.channel], [], [])
+                    if self.channel in r:
+                        logger.info(f"zmodem = {zmodem} zmodemOO = {zmodemOO}")
+                        if zmodemOO:
+                            zmodemOO = False
+                            data = self.channel.recv(2)
+                            if not data:
+                                break
+                            if data == b'OO':
+                                async_to_sync(websocket_channel.send)(self.channel_name, {
+                                    "type": "terminal_message",
+                                    "message": data
+                                })
+                                continue
+                            else:
+                                data = data + self.channel.recv(4096)
                         else:
-                            data = data + self.channel.recv(4096)
-                    else:
-                        data = self.channel.recv(4096)
+                            data = self.channel.recv(4096)
+                        logger.info(f"data = {data}")
                         if not len(data):
                             break
-                    logger.info(f"data = {data}")
-                    if zmodem:
-                        if zmodem_rz_end in data or zmodem_sz_end in data:
-                            logger.info(f"zmodem end")
-                            zmodem = False
-                            if zmodem_sz_end in data:
-                                zmodemOO = True
-                        if zmodem_cancel in data:
-                            zmodem = False
-                        async_to_sync(websocket_channel.send)(self.channel_name, {
-                            "type": "terminal_message",
-                            "message": data
-                        })
-                        continue
-                    else:
-                        if zmodem_sz_start in data or zmodem_rz_start in data:
-                            # 单通道发送
-                            logger.info(f"zmodem start")
-                            zmodem = True
+                        if zmodem:
+                            if zmodem_rz_end in data or zmodem_sz_end in data:
+                                logger.info(f"zmodem end")
+                                zmodem = False
+                                if zmodem_sz_end in data:
+                                    zmodemOO = True
+                            if zmodem_cancel in data:
+                                zmodem = False
                             async_to_sync(websocket_channel.send)(self.channel_name, {
                                 "type": "terminal_message",
                                 "message": data
                             })
                             continue
                         else:
-                            logger.info(f"common message data = {data}")
-                            async_to_sync(websocket_channel.group_send)(self.room_id, {
-                                "type": "terminal_message",
-                                "message": u(data)
-                            })
-                    # 计算时差、记录内容
-                    end_time = time.time()
-                    delay = round(end_time - begin_time, 6)
-                    f.writelines([json.dumps([delay, 'o', u(data)]), '\n'])
+                            if zmodem_sz_start in data or zmodem_rz_start in data:
+                                # 单通道发送
+                                logger.info(f"zmodem start")
+                                zmodem = True
+                                async_to_sync(websocket_channel.send)(self.channel_name, {
+                                    "type": "terminal_message",
+                                    "message": data
+                                })
+                                continue
+                            else:
+                                logger.info(f"common message data = {data}")
+                                async_to_sync(websocket_channel.group_send)(self.room_id, {
+                                    "type": "terminal_message",
+                                    "message": u(data)
+                                })
+                        # 计算时差、记录内容
+                        end_time = time.time()
+                        delay = round(end_time - begin_time, 6)
+                        f.writelines([json.dumps([delay, 'o', u(data)]), '\n'])
+                except socket.timeout:
+                    logger.info(f"socket time out")
+                    break
+                except Exception as e:
+                    logger.exception(e)
+                    async_to_sync(websocket_channel.group_send)(self.room_id, {
+                        "type": "terminal_message",
+                        "message": data
+                    })
             logger.info(f"thread ID = {thread_ssh2_write.ident}  is alive = {thread_ssh2_write.is_alive()}")
             # 建立 redis 订阅机制, 先有订阅，才能发送
             redis_instance = redis.Redis(host=settings.REDIS_HOST)
@@ -317,13 +330,16 @@ class SubscribeWriteThread(threading.Thread):
         while self._control.isSet():
             try:
                 result = self.pubsub.get_message()
+                if isinstance(result, bytes):
+                    logger.info(f"send bytes data = {result}")
+                    self.channel.send(result)
                 if result and isinstance(result, dict):
                     logger.debug(f"result = {result}, type = {type(result)}")
                     data = result.get("data")
                     if isinstance(data, (str, bytes)):
                         if isinstance(data, bytes):
                             try:
-                                data = ast.literal_eval(data.decode('utf8'))
+                                data = u(data)
                             except Exception as e:
                                 data = data
                         else:
@@ -333,7 +349,7 @@ class SubscribeWriteThread(threading.Thread):
                                 data = data
                     else:
                         data = data
-                    logger.info(f"send write data = {data}")
+                    logger.info(f"redis receive data = {data}")
                     if isinstance(data, int):
                         # 第一次 接收内容为1
                         if data == 1 and first_flag:

@@ -238,8 +238,8 @@
             success: function (data) {
                 files = data.files
                 var _path = path
-                if (path.endsWith("/")){
-                    _path = path.slice(0, path.length -1)
+                if (path.endsWith("/")) {
+                    _path = path.slice(0, path.length - 1)
                 }
                 console.log("_path = " + _path)
                 load_file_list(files, _path)

@@ -44,20 +44,9 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
             self.channel_name,
         )
         await self.accept()
-        con = await self.get_connect()
-        # 真实高度, windows 、 字符数量
-        self.shell = ShellHandler(
-            channel_name=self.channel_name,
-            room_id=query_param.get("room_id"),
-            # channel=channel, channel_name=query_param.get("room_id"),
-        )
-        logger.info(f"shell = {self.shell}")
-        # 把会话 存储到 全局管理 列表中
-        settings.TERMINAL_SESSION_DICT[session_id] = self.shell
-        self.shell.connect(hostname=con.server, username=con.username, password=AesEncrypt().decrypt(con.password),
-                           port=con.port)
 
     async def disconnect(self, code):
+        logger.info(f"disconnect code = {code}")
         query_param = QueryDict(self.scope.get('query_string'))
         self.redis_pubsub.publish(query_param.get("room_id"), "<<<close>>>")
         session_id = self.scope['url_route']['kwargs']['session_id']
@@ -92,23 +81,40 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
                 if len(text_data_json) == 3:
                     cmd, width, height = text_data_json
                     logger.debug(f"ip = {cmd} width = {width} height = {height}")
-                    self.shell.resize_terminal(
-                        width_pixels=width, height_pixels=height,
-                        width=(width // 9), height=(height // 17)
-                    )
                     if cmd == "onopen":
+                        con = await self.get_connect()
+                        # 真实高度, windows 、 字符数量
+                        shell = ShellHandler(
+                            channel_name=self.channel_name,
+                            room_id=query_param.get("room_id"),
+                            # channel=channel, channel_name=query_param.get("room_id"),
+                        )
+                        # 把会话 存储到 全局管理 列表中
+                        settings.TERMINAL_SESSION_DICT[session_id] = shell
+                        shell.connect(hostname=con.server, username=con.username,
+                                      password=AesEncrypt().decrypt(con.password),
+                                      port=con.port)
                         # 根据操作系统 设定 使用
-                        self.shell.extra_params['width'] = width
-                        self.shell.extra_params['height'] = height
+                        shell.extra_params['width'] = width
+                        shell.extra_params['height'] = height
+                        shell.resize_terminal(
+                            width_pixels=width, height_pixels=height,
+                            width=(width // 9), height=(height // 17)
+                        )
                         if platform.system() == "Linux":
-                            self.shell.posix_shell()
+                            shell.posix_shell()
                         elif platform.system() == "Windows":
-                            self.shell.windows_shell()
+                            shell.windows_shell()
+                    elif cmd == "resize":
+                        settings.TERMINAL_SESSION_DICT[session_id].resize_terminal(
+                            width_pixels=width, height_pixels=height,
+                            width=(width // 9), height=(height // 17)
+                        )
             except Exception as e:
                 self.redis_pubsub.publish(query_param.get("room_id"), text_data)  # 频道
         if bytes_data:
             # 字节流发送
-            self.shell.websocket_bytes_to_ssh(bytes_data)
+            self.redis_pubsub.publish(query_param.get("room_id"), bytes_data)
 
     # 接收通道消息
     async def terminal_message(self, event):
