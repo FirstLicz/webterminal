@@ -7,6 +7,9 @@ import logging
 import io
 import os
 import tarfile
+import paramiko
+
+from terminal.models import Connections
 
 logger = logging.getLogger("test" if settings.DEBUG else "default")
 
@@ -14,16 +17,16 @@ logger = logging.getLogger("test" if settings.DEBUG else "default")
 @deconstructible
 class SFTPStorage(Storage):
 
-    def __init__(self, token):
-        if not token:
-            raise ValueError("没有会话ID")
-        self.token = token
-        if not settings.TERMINAL_SESSION_DICT[token]:
-            raise KeyError(f"{token} not existed")
-        self.sftp = settings.TERMINAL_SESSION_DICT[token].ssh.open_sftp()
-
-    def __del__(self):
-        self.sftp.close()
+    def __init__(self, server: Connections = None):
+        if not server:
+            raise ValueError("连接对象不存在")
+        ssh = paramiko.Transport((server.server, int(server.port)))
+        try:
+            ssh.connect(username=server.username, password=server.password)
+        except Exception as e:
+            logger.exception(e)
+            raise ValueError(f"sftp 连接失败:{e}")
+        self.sftp = paramiko.SFTPClient.from_transport(ssh)
 
     def _open(self, filename, mode='rb'):
         return self.sftp.open(filename, mode)

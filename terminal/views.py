@@ -4,6 +4,7 @@ from django.http.response import JsonResponse, FileResponse, StreamingHttpRespon
 from django.conf import settings
 from django.utils.encoding import escape_uri_path
 from wsgiref.util import FileWrapper
+from django.core.cache import cache
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
@@ -16,6 +17,7 @@ import os
 
 from common.custom_storge import SFTPStorage
 from common.utils import SFTPFileResponse, StreamingFileResponse
+from terminal.models import Connections
 
 logger = logging.getLogger("test" if settings.DEBUG else "default")
 
@@ -25,11 +27,12 @@ logger = logging.getLogger("test" if settings.DEBUG else "default")
 
 class WebSshTwoView(View):
 
-    def get(self, request):
+    def get(self, request, server_id):
         room_id = request.GET.get("room_id")  # 可以随机生成、但是要入库-->找到即可
         return render(request, "terminal/ssh.html", {
             "session_id": uuid.uuid1().hex,
-            "room_id": room_id
+            "room_id": room_id,
+            "server_id": server_id,
         })
 
 
@@ -113,19 +116,19 @@ class TerminalSftp(View):
             result_list.append(_dict)
         return result_list
 
-    def sftp_storage(self, token, cmd, path, name):
+    def sftp_storage(self, server, cmd, path, name):
         """
             name: GET method 是target path name
                   POST method 是 files
         """
-        storage = SFTPStorage(token)
+        storage = SFTPStorage(server)
         if cmd == "download":
             filename = Path(path, name).as_posix()
             is_dir = storage.is_dir(filename)
             logger.info(f"download filename = {filename} is_dir = {is_dir}")
             if is_dir:
                 # 目录下载, 临时目录
-                local_path = Path(settings.MEDIA_ROOT, token, "_DOWNTMP")
+                local_path = Path(settings.MEDIA_ROOT, server.id, "_DOWNTMP")
                 if not local_path.is_dir():
                     os.makedirs(local_path.as_posix())
                 tarfile = storage.download_folder(filename, local_path.as_posix())
@@ -185,17 +188,17 @@ class TerminalSftp(View):
     def render_to_response(self, **kwargs):
         return
 
-    def get(self, request, token):
+    def get(self, request, server_id):
         path = request.GET.get('path', "/")
         cmd = request.GET.get('cmd', "ls")
         option = request.GET.get('option', "sftp")
         name = request.GET.get("name", "")
-        logger.info(f"token = {token}, param = {path}, option = {option}, name = {name}")
+        logger.info(
+            f"server_id = {server_id} type server_id = {type(server_id)}, param = {path}, option = {option}, name = {name}")
         try:
-            shell = settings.TERMINAL_SESSION_DICT[token]
-            logger.info(f"shell object = {shell}")
+            server = Connections.objects.get(id=int(server_id))
             if option == "sftp":
-                return self.sftp_storage(token, cmd, path, name)
+                return self.sftp_storage(server, cmd, path, name)
             else:
                 dirs, files = list(), list()
             return

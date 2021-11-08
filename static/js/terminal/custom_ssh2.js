@@ -229,10 +229,8 @@ $(function () {
             let promise;
             console.log("zsession.type = " + zsession.type)
             if (zsession.type === "receive") {
-                term.write("\r\n");
                 promise = downloadFile(zsession);
             } else if (zsession.type === "send") {
-                term.write("\r\n");
                 promise = uploadFile(zsession);
             }
             promise.catch(console.error.bind(console)).then(() => {

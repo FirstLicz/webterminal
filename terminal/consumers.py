@@ -10,10 +10,12 @@ import platform
 from django.conf import settings
 from django.http.request import QueryDict
 from channels.layers import get_channel_layer
+from django.core.cache import cache
+import paramiko
 
 from terminal.models import Connections
 from utils.encrypt import AesEncrypt
-from terminal.interactive import ShellHandler
+from terminal.interactive import ShellHandler, LinuxInteractiveThread, SubscribeWriteThread
 
 __all__ = ["AsyncTerminalConsumer", ]
 logger = logging.getLogger("default")
@@ -23,9 +25,14 @@ connect_dict = {}
 
 class AsyncTerminalConsumer(AsyncWebsocketConsumer):
 
-    def __init__(self):
-        super(AsyncTerminalConsumer, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(AsyncTerminalConsumer, self).__init__(*args, **kwargs)
         self.redis_pubsub = self.get_pubsub()
+        self.cmd = []  # 所有命令
+        self.cmd_tmp = ''  # 一行命令
+        self.tab_mode = False  # 使用tab命令补全时需要读取返回数据然后添加到当前输入命令后
+        self.history_mode = False
+        self.index = 0
 
     async def connect(self):
         session_id = self.scope['url_route']['kwargs']['session_id']
@@ -35,12 +42,11 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
         # self.channel_name = query_param.get("room_id")    # 无效
         # 增加到异步
         # 分组添加，使用 channel_name
-        room_id = query_param.get('room_id')
-        logger.info(f"room_id = {room_id}")
+        logger.info(f"room_id = {session_id}")
         pubsub_channels = self.get_pubsub().pubsub_channels()
         logger.info(f"pubsub_channels = {pubsub_channels}")
         await self.channel_layer.group_add(
-            query_param.get("room_id"),
+            session_id,
             self.channel_name,
         )
         await self.accept()
@@ -48,12 +54,11 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
     async def disconnect(self, code):
         logger.info(f"disconnect code = {code}")
         query_param = QueryDict(self.scope.get('query_string'))
-        self.redis_pubsub.publish(query_param.get("room_id"), "<<<close>>>")
         session_id = self.scope['url_route']['kwargs']['session_id']
-        del settings.TERMINAL_SESSION_DICT[session_id]
+        self.redis_pubsub.publish(session_id, json.dumps(["close"]))
         # 分组添加，使用 channel_name
         await self.channel_layer.group_discard(
-            query_param.get("room_id"),
+            session_id,
             self.channel_name,
         )
 
@@ -83,43 +88,61 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
                     logger.debug(f"ip = {cmd} width = {width} height = {height}")
                     if cmd == "onopen":
                         con = await self.get_connect()
-                        # 真实高度, windows 、 字符数量
-                        shell = ShellHandler(
-                            channel_name=self.channel_name,
-                            room_id=query_param.get("room_id"),
-                            # channel=channel, channel_name=query_param.get("room_id"),
-                        )
-                        # 把会话 存储到 全局管理 列表中
-                        settings.TERMINAL_SESSION_DICT[session_id] = shell
-                        shell.connect(hostname=con.server, username=con.username,
-                                      password=AesEncrypt().decrypt(con.password),
-                                      port=con.port)
-                        # 根据操作系统 设定 使用
-                        shell.extra_params['width'] = width
-                        shell.extra_params['height'] = height
-                        shell.resize_terminal(
-                            width_pixels=width, height_pixels=height,
-                            width=(width // 9), height=(height // 17)
-                        )
+                        try:
+                            # 真实高度, windows 、 字符数量
+                            ssh = paramiko.SSHClient()
+                            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                            extra_params = dict()
+                            extra_params['ssh'] = ssh
+                            # ssh client
+                            ssh.connect(hostname=con.server, username=con.username,
+                                        password=AesEncrypt().decrypt(con.password), port=int(con.port),
+                                        timeout=3)
+                            channel = ssh.invoke_shell(width=(width // 9), height=(height // 17), term='xterm')
+                            channel.settimeout(0.0)
+                        except socket.timeout:
+                            await self.send(text_data='\033[1;3;31mConnect to server time out\033[0m')
+                            logger.error("Connect to server {0} time out!".format(con.server))
+                            await self.close()
+                            return
+                        except Exception as e:
+                            await self.send(text_data='\033[1;3;31mCan not connect to server: {0}\033[0m'.format(e))
+                            logger.error("Can not connect to server {0}: {1}".format(con.server, e))
+                            await self.close()
+                            return
+                        # # 根据操作系统 设定 使用
+                        extra_params['width'] = width
+                        extra_params['height'] = height
+                        # channel.resize_pty(
+                        #     width_pixels=width, height_pixels=height,
+                        #     width=(width // 9), height=(height // 17)
+                        # )
                         if platform.system() == "Linux":
-                            shell.posix_shell()
+                            write = SubscribeWriteThread(channel=channel, channel_name=self.channel_name,
+                                                         room_id=session_id, extra_params=extra_params)
+                            write.setDaemon(True)
+                            write.start()
+                            extra_params["thread_ssh2_write"] = write
+                            display = LinuxInteractiveThread(channel=channel, channel_name=self.channel_name,
+                                                             room_id=session_id, extra_params=extra_params)
+                            display.setDaemon(True)
+                            display.start()
                         elif platform.system() == "Windows":
-                            shell.windows_shell()
+                            # shell.windows_shell()
+                            pass
                     elif cmd == "resize":
-                        settings.TERMINAL_SESSION_DICT[session_id].resize_terminal(
-                            width_pixels=width, height_pixels=height,
-                            width=(width // 9), height=(height // 17)
-                        )
+                        self.redis_pubsub.publish(session_id, json.dumps(text_data_json))
             except Exception as e:
-                self.redis_pubsub.publish(query_param.get("room_id"), text_data)  # 频道
+                self.redis_pubsub.publish(session_id, text_data)  # 频道
         if bytes_data:
             # 字节流发送
-            self.redis_pubsub.publish(query_param.get("room_id"), bytes_data)
+            self.redis_pubsub.publish(session_id, bytes_data)
+            # await self.send(bytes_data=bytes_data)
 
     # 接收通道消息
     async def terminal_message(self, event):
         message = event["message"]
-        logger.info(f"message = {message}")
+        # logger.info(f"message = {message}")
         # Send message to websocket
         if isinstance(message, str):
             await self.send(text_data=message)
@@ -130,7 +153,7 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
     # 接收分组消息
     async def terminal_group_message(self, event):
         message = event["message"]
-        logger.info(f"message = {message}")
+        # logger.info(f"message = {message}")
         # Send message to websocket
         await self.send(text_data=message)
 
@@ -183,6 +206,6 @@ class AsyncTerminalConsumerMonitor(AsyncWebsocketConsumer):
     # 接收分组消息
     async def terminal_message(self, event):
         message = event["message"]
-        logger.info(f"message = {message}")
+        # logger.info(f"message = {message}")
         # Send message to websocket
         await self.send(text_data=message)

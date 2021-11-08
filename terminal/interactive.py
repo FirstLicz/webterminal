@@ -10,6 +10,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import os
 from django.conf import settings
+from django.core.cache import cache
 
 from paramiko.channel import Channel
 from queue import Queue
@@ -19,6 +20,7 @@ import time
 import platform
 import uuid
 import ast
+import re
 
 try:
     import select
@@ -26,6 +28,8 @@ try:
     import tty
 except ImportError:
     pass
+
+from utils.commandDeal import CommandDeal
 
 logger = logging.getLogger("default")
 zmodem_sz_start = b'rz\r**\x18B00000000000000\r\x8a'
@@ -37,31 +41,35 @@ zmodem_cancel = b'\x18\x18\x18\x18\x18\x08\x08\x08\x08\x08'
 
 class ShellHandler:
 
-    def __init__(self, channel_name=None, room_id: str = None):
+    def __init__(self, channel_name=None, session_id: str = None, hostname=None, username=None, password=None,
+                 port=None):
         self.ssh = paramiko.SSHClient()
         self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.channel = None
         self.channel_name = channel_name
         self.extra_params = dict()
-        self.room_id = room_id
+        self.room_id = session_id
         self.extra_params['ssh'] = self.ssh
-
-    def connect(self, hostname=None, username=None, password=None, port=None):
         # ssh client
-        self.ssh.connect(hostname=hostname, username=username, password=password, port=port)
-        self.channel = self.ssh.invoke_shell()
+        self.ssh.connect(hostname=hostname, username=username, password=password, port=port, timeout=3)
+        self.channel = self.ssh.invoke_shell(term='xterm')
+        # socket 不能 pickle
+        # cache.set(session_id, {
+        #     "ssh": self.ssh,
+        # })
 
     def __del__(self):
         logger.info(f"self {self} close")
-        self.ssh.close()
+        # self.ssh.close()
 
     def windows_shell(self):
         logger.info(f"channel = {self.channel}")
         write = SubscribeWriteThread(channel=self.channel, channel_name=self.channel_name, room_id=self.room_id)
+        write.setDaemon(True)
         write.start()
         self.extra_params["thread_ssh2_write"] = write
         display = InteractiveThread(channel=self.channel, channel_name=self.channel_name, room_id=self.room_id,
                                     extra_params=self.extra_params)
+        display.setDaemon(True)
         display.start()
         # 接收前端页面输入内容，发送到 shell
         # try:
@@ -78,10 +86,12 @@ class ShellHandler:
     def posix_shell(self):
         write = SubscribeWriteThread(channel=self.channel, channel_name=self.channel_name, room_id=self.room_id,
                                      extra_params=self.extra_params)
+        write.setDaemon(True)
         write.start()
         self.extra_params["thread_ssh2_write"] = write
         display = LinuxInteractiveThread(channel=self.channel, channel_name=self.channel_name, room_id=self.room_id,
                                          extra_params=self.extra_params)
+        display.setDaemon(True)
         display.start()
 
     def resize_terminal(self, width=80, height=24, width_pixels=0, height_pixels=0):
@@ -217,9 +227,11 @@ class LinuxInteractiveThread(InteractiveThread):
         command = list()
         zmodem = False
         zmodemOO = False
+        vim_flag = False
+        vim_data = ''
         try:
             f.writelines([json.dumps(first_line), '\n'])
-            self.channel.settimeout(0.0)
+            # self.channel.settimeout(0.0)
             data = None
             while self._run_control.isSet():
                 self._control.wait()  # 为True时立即返回，为False时阻塞直到内部设置为True返回
@@ -242,8 +254,8 @@ class LinuxInteractiveThread(InteractiveThread):
                                 data = data + self.channel.recv(4096)
                         else:
                             data = self.channel.recv(4096)
-                        logger.info(f"data = {data}")
-                        if not len(data):
+                        # logger.info(f"data = {u(data)} active = {self.channel.active}")
+                        if not len(u(data)):
                             break
                         if zmodem:
                             if zmodem_rz_end in data or zmodem_sz_end in data:
@@ -269,14 +281,35 @@ class LinuxInteractiveThread(InteractiveThread):
                                 })
                                 continue
                             else:
-                                logger.info(f"common message data = {data}")
+                                message_data = u(data)
+                                if message_data == "exit\r\n" or message_data == "logout\r\n" or \
+                                        message_data == 'logout':
+                                    self.channel.close()
+                                if '\r\n' not in message_data:
+                                    command.append(message_data)
+                                else:
+                                    logger.info(f"command = {command}")
+                                    command_result = CommandDeal().deal_command(''.join(command))
+                                    if len(command_result) != 0:
+                                        # vim command record patch
+                                        logger.info(f"command = {command_result}")
+                                        if command_result.strip().startswith('vi') or \
+                                                command_result.strip().startswith('fg'):
+                                            vim_flag = True
+                                        else:
+                                            if vim_flag:
+                                                if re.compile('\[.*@.*\][\$#]').search(vim_data):
+                                                    vim_flag = False
+                                                    vim_data = ''
+                                            else:
+                                                pass
+                                        command = list()
                                 async_to_sync(websocket_channel.group_send)(self.room_id, {
                                     "type": "terminal_message",
-                                    "message": u(data)
+                                    "message": message_data
                                 })
                         # 计算时差、记录内容
-                        end_time = time.time()
-                        delay = round(end_time - begin_time, 6)
+                        delay = round(time.time() - begin_time, 6)
                         f.writelines([json.dumps([delay, 'o', u(data)]), '\n'])
                 except socket.timeout:
                     logger.info(f"socket time out")
@@ -287,14 +320,14 @@ class LinuxInteractiveThread(InteractiveThread):
                         "type": "terminal_message",
                         "message": data
                     })
+            # 发送关闭线程命令
+            thread_ssh2_write.stop()
+            redis_instance = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
+            redis_instance.publish(self.room_id, json.dumps(['close']))
+            time.sleep(0.05)
             logger.info(f"thread ID = {thread_ssh2_write.ident}  is alive = {thread_ssh2_write.is_alive()}")
-            # 建立 redis 订阅机制, 先有订阅，才能发送
-            redis_instance = redis.Redis(host=settings.REDIS_HOST)
-            pubsub = redis_instance.pubsub()
-            pubsub.unsubscribe(self.room_id)
-            logger.info(f"unsubscribe name = {self.room_id}")
             # 入口存储 视频记录
-            duration_time = end_time - begin_time
+            duration_time = time.time() - begin_time
             logger.info(f"duration_time = {round(duration_time)}")
             time.sleep(0.01)
             logger.info(f"last thread ID = {thread_ssh2_write.ident}  is alive = {thread_ssh2_write.is_alive()}")
@@ -302,6 +335,7 @@ class LinuxInteractiveThread(InteractiveThread):
             logger.exception(e)
         finally:
             f.close()
+            # cache.delete(self.room_id)
 
 
 class SubscribeWriteThread(threading.Thread):
@@ -350,21 +384,31 @@ class SubscribeWriteThread(threading.Thread):
                     else:
                         data = data
                     logger.info(f"redis receive data = {data}")
-                    if isinstance(data, int):
-                        # 第一次 接收内容为1
-                        if data == 1 and first_flag:
-                            first_flag = False
-                            continue
-                    if isinstance(data, bytes):
-                        logger.info(f"send bytes data = {data}")
-                        self.channel.send(data)
-                    else:
-                        logger.info(f"send str data = {str(data)}")
-                        self.channel.send(str(data))
+                    try:
+                        data = json.loads(data)
+                        if data[0] == "close":
+                            self.channel.close()
+                            self.extra_params['ssh'].close()
+                            break
+                        elif data[0] == "resize":
+                            self.channel.resize_pty(width=(data[1] // 9), height=(data[2] // 17))
+                    except:
+                        if isinstance(data, int):
+                            # 第一次 接收内容为1
+                            if data == 1 and first_flag:
+                                first_flag = False
+                                continue
+                        if isinstance(data, bytes):
+                            logger.info(f"send bytes data = {data}")
+                            self.channel.send(data)
+                        else:
+                            logger.info(f"send str data = {str(data)}")
+                            self.channel.send(str(data))
             except Exception as e:
                 logger.exception(e)
             # time.sleep(0.001)
-        logger.info(f"SubscribeWriteThread ID = {self.ident} closed")
+        logger.info(f"SubscribeWriteThread ID = {self.ident} closed unsubscribe name = {self.room_id}")
+        self.pubsub.unsubscribe(self.room_id)
 
 
 if __name__ == '__main__':
