@@ -224,7 +224,8 @@ class LinuxInteractiveThread(InteractiveThread):
         # target_file = os.path.join(target_dir, self.channel_name.split(".")[1])   # 默认单通道
         target_file = os.path.join(target_dir, self.channel_name + "_" + uuid.uuid1().hex)  # 团体通道
         f = open(target_file, 'w', encoding="utf8")
-        screen_record = ScreenRecord(session=self.room_id, path=target_file, start_time=now())
+        screen_record = ScreenRecord(session=self.room_id, path=target_file, start_time=now(),
+                                     protocol=ScreenRecord.SSH2)
         command = list()
         zmodem = False
         zmodemOO = False

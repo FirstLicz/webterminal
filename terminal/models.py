@@ -44,11 +44,25 @@ class CommandLog(models.Model):
 
 class ScreenRecord(models.Model):
 
+    SSH2 = "ssh2"
+    RDP = "rdp"
+    TELNET = "telnet"
+    SSH = "ssh"
+
+    CHOOSE_PROTO = (
+        (SSH2, "ssh2"),
+        (RDP, "rdp"),
+        (TELNET, "telnet"),
+        (SSH, "ssh"),
+    )
+
     session = models.CharField(max_length=64, verbose_name="会话ID", db_index=True)
     path = models.FilePathField(verbose_name="屏幕记录", match="/media/")
     start_time = models.DateTimeField(verbose_name="开始时间", blank=True, null=True)
     end_time = models.DateTimeField(verbose_name="结束时间", blank=True, null=True)
     duration_second = models.IntegerField(verbose_name="持续N秒", blank=True, null=True)
+    protocol = models.CharField(max_length=10, verbose_name="协议类别", choices=CHOOSE_PROTO, default=SSH2, blank=True,
+                                null=True)
 
     class Meta:
         verbose_name = "screen_record"
