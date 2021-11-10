@@ -199,17 +199,17 @@ $(function () {
     /**/
     var defaultSettings = {
         watermarl_element: "custom_watermark",
-        watermark_txt: "",
-        watermark_img: '/media/img/demo.png',
+        watermark_txt: "192.168.1.83 addda dadadad",
+        //watermark_img: '/media/img/demo.png',
         watermark_x: 20, //水印起始位置x轴坐标
         watermark_y: 20, //水印起始位置Y轴坐标
         watermark_rows: 9, //水印行数
         watermark_cols: 9, //水印列数
         watermark_x_space: 70, //水印x轴间隔
         watermark_y_space: 30, //水印y轴间隔
-        watermark_color: '#000', //水印字体颜色
+        watermark_color: '#CCCCCC', //水印字体颜色
         watermark_alpha: 0.4, //水印透明度
-        watermark_fontsize: '15px', //水印字体大小
+        watermark_fontsize: '22px', //水印字体大小
         watermark_font: '微软雅黑', //水印字体
         watermark_width: 210, //水印宽度
         watermark_height: 80, //水印长度
