@@ -11,7 +11,7 @@ from asgiref.sync import async_to_sync
 import os
 from django.conf import settings
 from django.core.cache import cache
-
+from django.utils.timezone import now
 from paramiko.channel import Channel
 from queue import Queue
 import redis
@@ -30,6 +30,7 @@ except ImportError:
     pass
 
 from utils.commandDeal import CommandDeal
+from terminal.models import ScreenRecord
 
 logger = logging.getLogger("default")
 zmodem_sz_start = b'rz\r**\x18B00000000000000\r\x8a'
@@ -205,8 +206,7 @@ class LinuxInteractiveThread(InteractiveThread):
     def run(self) -> None:
         websocket_channel = get_channel_layer()
         begin_time = time.time()
-        end_time = begin_time
-        ssh_obj = self.extra_params.get("ssh")
+        ssh = self.extra_params['ssh']
         thread_ssh2_write = self.extra_params.get("thread_ssh2_write", None)
         # 记录文件日志, 使用version 2 版本，优化 顺序写文件，防止文件过大，吃内存
         first_line = {
@@ -224,6 +224,7 @@ class LinuxInteractiveThread(InteractiveThread):
         # target_file = os.path.join(target_dir, self.channel_name.split(".")[1])   # 默认单通道
         target_file = os.path.join(target_dir, self.channel_name + "_" + uuid.uuid1().hex)  # 团体通道
         f = open(target_file, 'w', encoding="utf8")
+        screen_record = ScreenRecord(session=self.room_id, path=target_file, start_time=now())
         command = list()
         zmodem = False
         zmodemOO = False
@@ -285,6 +286,10 @@ class LinuxInteractiveThread(InteractiveThread):
                                 if message_data == "exit\r\n" or message_data == "logout\r\n" or \
                                         message_data == 'logout':
                                     self.channel.close()
+                                if message_data == "<<<close>>>":
+                                    self.channel.close()
+                                    ssh.close()
+                                    break
                                 if '\r\n' not in message_data:
                                     command.append(message_data)
                                 else:
@@ -320,22 +325,24 @@ class LinuxInteractiveThread(InteractiveThread):
                         "type": "terminal_message",
                         "message": data
                     })
-            # 发送关闭线程命令
-            thread_ssh2_write.stop()
-            redis_instance = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
-            redis_instance.publish(self.room_id, json.dumps(['close']))
-            time.sleep(0.05)
-            logger.info(f"thread ID = {thread_ssh2_write.ident}  is alive = {thread_ssh2_write.is_alive()}")
-            # 入口存储 视频记录
-            duration_time = time.time() - begin_time
-            logger.info(f"duration_time = {round(duration_time)}")
-            time.sleep(0.01)
-            logger.info(f"last thread ID = {thread_ssh2_write.ident}  is alive = {thread_ssh2_write.is_alive()}")
         except Exception as e:
             logger.exception(e)
         finally:
             f.close()
             # cache.delete(self.room_id)
+            # 入口存储 视频记录
+            duration_time = round(time.time() - begin_time)
+            logger.info(f"duration_time = {duration_time}")
+            screen_record.end_time = now()
+            screen_record.duration_second = duration_time
+            screen_record.save()
+            logger.info(f"save screen record complete")
+            # 发送关闭线程命令
+            if thread_ssh2_write.is_alive():
+                thread_ssh2_write.stop()
+            redis_instance = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
+            redis_instance.publish(self.room_id, json.dumps(['close']))
+            logger.info(f"thread ID = {thread_ssh2_write.ident}  is alive = {thread_ssh2_write.is_alive()}")
 
 
 class SubscribeWriteThread(threading.Thread):
@@ -387,8 +394,7 @@ class SubscribeWriteThread(threading.Thread):
                     try:
                         data = json.loads(data)
                         if data[0] == "close":
-                            self.channel.close()
-                            self.extra_params['ssh'].close()
+                            self.channel.send('<<<close>>>')  # close flag
                             break
                         elif data[0] == "resize":
                             self.channel.resize_pty(width=(data[1] // 9), height=(data[2] // 17))

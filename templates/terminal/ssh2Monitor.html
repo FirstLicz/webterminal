@@ -14,7 +14,7 @@
 </head>
 <body style="margin: 0">
 <div id="terminal"></div>
-<script src="{% static 'js/terminal/custom_ssh2.js' %}"></script>
+<!-- <script src="{% static 'js/terminal/custom_ssh2.js' %}"></script> -->
 <script>
     var can_control = false;
     $(function () {
@@ -39,7 +39,7 @@
         term._initialized = true;
         // 创建 websocket
         var ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
-        var url = ws_scheme + "://127.0.0.1:8000/ws/terminal/monitor/{{ session_id }}/?room_id={{ room_id }}"
+        var url = ws_scheme + "://127.0.0.1:8000/ws/terminal/monitor/{{ session_id }}/"
         var ws = new WebSocket(url);
         var fitAddon = new FitAddon.FitAddon()
         /*var attachAddon = new AttachAddon.AttachAddon(ws)

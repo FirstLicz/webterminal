@@ -76,9 +76,7 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
         session_id = self.scope['url_route']['kwargs']['session_id']
         logger.debug(f"text_data = {text_data}, bytes_data = {bytes_data} session_id = {session_id}")
         # send message to room group
-        query_param = QueryDict(self.scope.get('query_string'))
-        room_id = query_param.get('room_id')
-        logger.info(f"room_id = {room_id}")
+        # query_param = QueryDict(self.scope.get('query_string'))
         # self.channel_name = query_param.get("room_id")    # 无效
         if text_data:
             try:
@@ -167,15 +165,14 @@ class AsyncTerminalConsumerMonitor(AsyncWebsocketConsumer):
     async def connect(self):
         # 监听
         # 如果 订阅不存在、既无法连接上
-        query_param = QueryDict(self.scope.get('query_string'))
-        logger.info(f"query_param =  {query_param}")
+        session_id = self.scope['url_route']['kwargs']['session_id']
+        logger.info(f"ssh2 session_id =  {session_id}")
         logger.info(f"pubsub_channels = {self.redis_pubsub.pubsub_channels()}")
-        room_id = query_param.get("room_id", "")
         # 监听 订阅是否存在、不存在，不允许连接
-        if room_id.encode() in self.redis_pubsub.pubsub_channels():
+        if session_id.encode() in self.redis_pubsub.pubsub_channels():
             # 分组添加，使用 channel_name
             await self.channel_layer.group_add(
-                room_id,
+                session_id,
                 self.channel_name,
             )
             await self.accept()
@@ -188,20 +185,17 @@ class AsyncTerminalConsumerMonitor(AsyncWebsocketConsumer):
 
     async def disconnect(self, code):
         # 取消订阅
-        query_param = QueryDict(self.scope.get('query_string'))
+        session_id = self.scope['url_route']['kwargs']['session_id']
         # 分组添加，使用 channel_name
-        room_id = query_param.get("room_id", "")
         await self.channel_layer.group_discard(
-            room_id,
+            session_id,
             self.channel_name,
         )
 
     async def receive(self, text_data=None, bytes_data=None):
-        logger.info(f"monitor text_data = {text_data}")
-        query_param = QueryDict(self.scope.get('query_string'))
-        # 分组添加，使用 channel_name
-        room_id = query_param.get("room_id", "")
-        self.redis_pubsub.publish(room_id, text_data)  # 频道
+        session_id = self.scope['url_route']['kwargs']['session_id']
+        logger.info(f"monitor text_data = {text_data} session_id = {session_id}")
+        self.redis_pubsub.publish(session_id, text_data)  # 频道
 
     # 接收分组消息
     async def terminal_message(self, event):

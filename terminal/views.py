@@ -17,7 +17,7 @@ import os
 
 from common.custom_storge import SFTPStorage
 from common.utils import SFTPFileResponse, StreamingFileResponse
-from terminal.models import Connections
+from terminal.models import Connections, ScreenRecord
 
 logger = logging.getLogger("test" if settings.DEBUG else "default")
 
@@ -38,11 +38,9 @@ class WebSshTwoView(View):
 
 class WebSShTwoMonitorView(View):
 
-    def get(self, request):
-        room_id = request.GET.get("room_id")
+    def get(self, request, session_id):
         return render(request, "terminal/ssh2Monitor.html", {
-            "session_id": uuid.uuid1().hex,
-            "room_id": room_id
+            "session_id": session_id,
         })
 
 
@@ -61,9 +59,12 @@ class WebSShTwoKillView(View):
 
 class TerminalPlayView(View):
 
-    def get(self, request):
+    def get(self, request, session_id):
         # TODO 读取视频文件
-        video_path = "/media/" + "SSH2/0b3016bed7eb4e26ba2c6883e65fff66!f03b512444d44f7f87626dba67c9f00c"
+        screen_record = ScreenRecord.objects.get(session=session_id)
+        if screen_record:
+            logger.info(f"path = {screen_record.path} len = {len(settings.BASE_DIR.as_posix())}")
+            video_path = screen_record.path[len(settings.BASE_DIR.as_posix()):]
         return render(request, "terminal/terminal_play.html", locals())
 
 

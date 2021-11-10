@@ -199,8 +199,8 @@ $(function () {
     /**/
     var defaultSettings = {
         watermarl_element: "custom_watermark",
-        watermark_txt: "192.168.1.83 addda dadadad",
-        //watermark_img: '/media/img/demo.png',
+        //watermark_txt: "192.168.1.83 addda dadadad",
+        watermark_img: '/media/img/demo.png',
         watermark_x: 20, //水印起始位置x轴坐标
         watermark_y: 20, //水印起始位置Y轴坐标
         watermark_rows: 9, //水印行数
@@ -237,7 +237,7 @@ $(function () {
     term._initialized = true;
     // 创建 websocket
     var ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
-    var url = ws_scheme + "://127.0.0.1:8000/ws/terminal/" + window.session_id + "/?room_id=" + room_id
+    var url = ws_scheme + "://127.0.0.1:8000/ws/terminal/" + window.session_id + "/"
     var ws = new WebSocket(url);
     var fitAddon = new FitAddon.FitAddon()
     var attachAddon = new AttachAddon.AttachAddon(ws)

@@ -40,3 +40,17 @@ class CommandLog(models.Model):
         verbose_name = "command_log"
         db_table = "command_log"
         verbose_name_plural = verbose_name
+
+
+class ScreenRecord(models.Model):
+
+    session = models.CharField(max_length=64, verbose_name="会话ID", db_index=True)
+    path = models.FilePathField(verbose_name="屏幕记录", match="/media/")
+    start_time = models.DateTimeField(verbose_name="开始时间", blank=True, null=True)
+    end_time = models.DateTimeField(verbose_name="结束时间", blank=True, null=True)
+    duration_second = models.IntegerField(verbose_name="持续N秒", blank=True, null=True)
+
+    class Meta:
+        verbose_name = "screen_record"
+        db_table = "screen_record"
+        verbose_name_plural = verbose_name
