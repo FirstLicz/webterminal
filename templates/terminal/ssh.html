@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="{% static 'plugins/fine-uploader/fine-uploader-new.css' %}"/>
     <link rel="stylesheet" href="{% static 'plugins/sweetalert2/sweetalert2.css' %}"/>
     <script src="{% static 'plugins/sweetalert2/sweetalert2.all.js' %}"></script>
+    <script src="{% static 'js/watermark.js' %}"></script>
     <style>
         .custom-breadcrumb-item + .custom-breadcrumb-item {
             /*padding-left: .5rem*/
@@ -106,6 +107,9 @@
         </div>
     </div>
 </div>
+<!-- 水印 -->
+<div id="custom_watermark" style="overflow: hidden;"></div>
+
 <!-- The element where Fine Uploader will exist. -->
 
 <script type="text/template" id="qq-template">

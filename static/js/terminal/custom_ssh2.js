@@ -190,6 +190,32 @@ function command(cmd) {
 
 
 $(function () {
+    var watermark_div = $("#custom_watermark")
+    watermark_div.height = window.innerHeight;
+    watermark_div.width = window.innerWidth;
+    console.log("watermark_div.height = " + watermark_div.height)
+    console.log("watermark_div.width = " + watermark_div.width)
+    // 水印
+    /**/
+    var defaultSettings = {
+        watermarl_element: "custom_watermark",
+        watermark_txt: "",
+        watermark_img: '/media/img/demo.png',
+        watermark_x: 20, //水印起始位置x轴坐标
+        watermark_y: 20, //水印起始位置Y轴坐标
+        watermark_rows: 9, //水印行数
+        watermark_cols: 9, //水印列数
+        watermark_x_space: 70, //水印x轴间隔
+        watermark_y_space: 30, //水印y轴间隔
+        watermark_color: '#000', //水印字体颜色
+        watermark_alpha: 0.4, //水印透明度
+        watermark_fontsize: '15px', //水印字体大小
+        watermark_font: '微软雅黑', //水印字体
+        watermark_width: 210, //水印宽度
+        watermark_height: 80, //水印长度
+        watermark_angle: 15 //水印倾斜度数
+    }
+    watermark(defaultSettings)
     var term = new Terminal({
         // cursorStyle: 'underline', //光标样式
         cursorBlink: true, // 光标闪烁
@@ -260,6 +286,9 @@ $(function () {
             "height": window.innerHeight - window.file_list_scroll.position().top
         })
         ws.send(JSON.stringify(["resize", terminal.offsetWidth, terminal.offsetHeight])); // 将消息发出
+        // 重置水印
+        $("#custom_watermark").html("")
+        watermark(defaultSettings)
     }
     // term.write('Hello from \x1B[1;3;31mxterm.js\x1B[0m $ ')
     ws.onopen = function () {

@@ -29,3 +29,14 @@ class Connections(models.Model):
     @classmethod
     def check_password(cls, passwd):
         pass
+
+
+class CommandLog(models.Model):
+
+    session = models.CharField(max_length=64, verbose_name="会话ID", db_index=True)
+    content = models.TextField(verbose_name="命令内容")
+
+    class Meta:
+        verbose_name = "command_log"
+        db_table = "command_log"
+        verbose_name_plural = verbose_name
