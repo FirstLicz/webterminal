@@ -48,12 +48,14 @@ class ScreenRecord(models.Model):
     RDP = "rdp"
     TELNET = "telnet"
     SSH = "ssh"
+    VNC = "vnc"
 
     CHOOSE_PROTO = (
         (SSH2, "ssh2"),
-        (RDP, "rdp"),
+        (RDP, "windows rdp"),
         (TELNET, "telnet"),
         (SSH, "ssh"),
+        (VNC, "vnc"),
     )
 
     session = models.CharField(max_length=64, verbose_name="会话ID", db_index=True)

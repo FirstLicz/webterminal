@@ -195,6 +195,10 @@ $(function () {
     watermark_div.width = window.innerWidth;
     console.log("watermark_div.height = " + watermark_div.height)
     console.log("watermark_div.width = " + watermark_div.width)
+    $("#indent").css({
+        position: "absolute", 'top': (window.innerHeight - 48) / 2,
+        'left': window.left_div.width() - 36, 'z-index': 10000
+    });
     // 水印
     /**/
     var defaultSettings = {
@@ -289,6 +293,10 @@ $(function () {
         // 重置水印
         $("#custom_watermark").html("")
         watermark(defaultSettings)
+        $("#indent").css({
+            position: "absolute", 'top': (window.innerHeight - 48) / 2,
+            'left': left_div.width() - 36, 'z-index': 10000
+        });
     }
     // term.write('Hello from \x1B[1;3;31mxterm.js\x1B[0m $ ')
     ws.onopen = function () {
@@ -316,6 +324,34 @@ $(function () {
         console.log(event)
     }
 
+    $("#indent").on("click", function () {
+        let indent = $(this)
+        if (indent.val() === "1") {
+            indent.val("0");
+            indent.attr("src", "/static/img/indent-1.png")
+            $("#right_div").css("display", "none");
+            $("#left_div").css("width", "100%");
+            $("#left_div").removeAttr('class')
+            setIndentCoord();
+        } else if (indent.val() === "0") {
+            indent.val("1");
+            indent.attr("src", "/static/img/indent.png")
+            $("#right_div").css("display", "block");
+            $("#left_div").css("width", "75%");
+             $("#left_div").attr('class', 'col-md-9 col-sm-9 col-xl-9 col-lg-9')
+            setIndentCoord();
+        }
+    })
+
+    function setIndentCoord() {
+        $("#indent").css({
+            position: "absolute", 'top': (window.innerHeight - 48) / 2,
+            'left': window.left_div.width() - 60, 'z-index': 10000
+        });
+        // 发送 窗口 改变大小
+        term.resize(parseInt(left_div.width() / 9), parseInt(window.innerHeight / 17))
+        fitAddon.fit()
+    }
 
     /*
     * rz 命令
