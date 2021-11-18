@@ -8,16 +8,22 @@ from utils.encrypt import AesEncrypt
 
 class Connections(models.Model):
 
+    SSH2 = "SSH2"
+    RDP = "RDP"
+    VNC = "VNC"
+    TELNET = 'TELNET'
+
     PROTOCOL_TYPE = [
-        ("SSH2", "Ssh2"),
-        ("RDP", "RDP"),
-        ("VNC", "RNV"),
+        (SSH2, "ssh2"),
+        (RDP, "rdp"),
+        (VNC, "vnc"),
+        (TELNET, "telnet"),
     ]
 
     name = models.CharField(max_length=128, verbose_name="别名")
     username = models.CharField(max_length=128, verbose_name="用户名", null=True, blank=False)
     password = models.CharField(max_length=256, verbose_name="用户密码")
-    protocol_type = models.CharField(max_length=6, choices=PROTOCOL_TYPE, verbose_name="协议类型")
+    protocol_type = models.CharField(max_length=6, choices=PROTOCOL_TYPE, verbose_name="协议类型", default=SSH2)
     server = models.CharField(max_length=16, verbose_name="ipv4", blank=False)
     port = models.CharField(max_length=5, verbose_name="端口", blank=False)
 

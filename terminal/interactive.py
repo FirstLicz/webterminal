@@ -256,7 +256,7 @@ class LinuxInteractiveThread(InteractiveThread):
                                 data = data + self.channel.recv(4096)
                         else:
                             data = self.channel.recv(4096)
-                        # logger.info(f"data = {u(data)} active = {self.channel.active}")
+                        logger.info(f"data = {u(data)} active = {self.channel.active}")
                         if not len(u(data)):
                             break
                         if zmodem:
@@ -287,6 +287,7 @@ class LinuxInteractiveThread(InteractiveThread):
                                 if message_data == "exit\r\n" or message_data == "logout\r\n" or \
                                         message_data == 'logout':
                                     self.channel.close()
+                                    break
                                 if message_data == "<<<close>>>":
                                     self.channel.close()
                                     ssh.close()

@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.views.generic import View
-from django.http.response import JsonResponse, FileResponse, StreamingHttpResponse
+from django.http.response import JsonResponse, FileResponse, StreamingHttpResponse, Http404
 from django.conf import settings
 from django.utils.encoding import escape_uri_path
 from wsgiref.util import FileWrapper
@@ -25,18 +25,31 @@ logger = logging.getLogger("test" if settings.DEBUG else "default")
 # Create your views here.
 
 
-class WebSshTwoView(View):
+class WebTerminalView(View):
 
     def get(self, request, server_id):
-        room_id = request.GET.get("room_id")  # 可以随机生成、但是要入库-->找到即可
-        return render(request, "terminal/ssh.html", {
-            "session_id": uuid.uuid1().hex,
-            "room_id": room_id,
-            "server_id": server_id,
-        })
+        try:
+            conn = Connections.objects.get(id=int(server_id))  # 可以随机生成、但是要入库-->找到即可
+        except:
+            return Http404("网页不存在")
+        if not conn:
+            return Http404("网页不存在")
+        logger.info(f"protocol type = {conn.protocol_type}")
+        if conn.protocol_type == Connections.TELNET:
+            return render(request, "terminal/telnet.html", {
+                "session_id": uuid.uuid1().hex,
+                "server_id": server_id,
+            })
+        elif conn.protocol_type == Connections.SSH2:
+            return render(request, "terminal/ssh.html", {
+                "session_id": uuid.uuid1().hex,
+                "server_id": server_id,
+            })
+        else:
+            return Http404("网页不存在")
 
 
-class WebSShTwoMonitorView(View):
+class WebTerminalMonitorView(View):
 
     def get(self, request, session_id):
         return render(request, "terminal/ssh2Monitor.html", {
@@ -44,7 +57,7 @@ class WebSShTwoMonitorView(View):
         })
 
 
-class WebSShTwoKillView(View):
+class WebTerminalKillView(View):
 
     def post(self, request):
         room_id = request.POST.get("room_id")

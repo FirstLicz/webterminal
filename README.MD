@@ -101,3 +101,5 @@ pip install [pyxtermjs](https://pypi.org/project/pyxtermjs/#description)
 from pysqlite3 import dbapi2 as Database # 启用pysqlite3
 # :wq 保存即可
 ```
+
+## Telnet 协议支持

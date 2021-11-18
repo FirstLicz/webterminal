@@ -12,12 +12,14 @@ from django.http.request import QueryDict
 from channels.layers import get_channel_layer
 from django.core.cache import cache
 import paramiko
+import telnetlib
 
 from terminal.models import Connections
 from utils.encrypt import AesEncrypt
-from terminal.interactive import ShellHandler, LinuxInteractiveThread, SubscribeWriteThread
+from terminal.interactive import LinuxInteractiveThread, SubscribeWriteThread
+from terminal.telnets import TelnetClient
 
-__all__ = ["AsyncTerminalConsumer", ]
+__all__ = ["AsyncTerminalConsumer", "AsyncTerminalConsumerMonitor", "AsyncTelnetConsumer"]
 logger = logging.getLogger("default")
 
 connect_dict = {}
@@ -202,4 +204,90 @@ class AsyncTerminalConsumerMonitor(AsyncWebsocketConsumer):
         message = event["message"]
         # logger.info(f"message = {message}")
         # Send message to websocket
+        await self.send(text_data=message)
+
+
+class AsyncTelnetConsumer(AsyncWebsocketConsumer):
+
+    def __init__(self, *args, **kwargs):
+        super(AsyncTelnetConsumer, self).__init__(*args, **kwargs)
+        self.telnet_client = TelnetClient(
+            # session_id=session_id
+        )
+
+    # 数据库 访问
+    @database_sync_to_async
+    def get_connect(self, db_id):
+        con = Connections.objects.get(id=db_id)
+        return con
+
+    def get_pubsub(self):
+        redis_instance = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
+        return redis_instance
+
+    async def connect(self):
+        session_id = self.scope['url_route']['kwargs']['session_id']
+        query_param = QueryDict(self.scope.get('query_string'))
+        logger.info(f"query_param =  {query_param} session_id = {session_id}")
+        # 修改 channel_name
+        # 增加到异步
+        # 分组添加，使用 channel_name
+        await self.channel_layer.group_add(
+            session_id,
+            self.channel_name,
+        )
+        await self.accept()
+
+    async def disconnect(self, code):
+        logger.info(f"disconnect code = {code}")
+        # query_param = QueryDict(self.scope.get('query_string'))
+        session_id = self.scope['url_route']['kwargs']['session_id']
+        self.telnet_client.close()
+        # 分组添加，使用 channel_name
+        await self.channel_layer.group_discard(
+            session_id,
+            self.channel_name,
+        )
+
+    async def receive(self, text_data=None, bytes_data=None):
+        session_id = self.scope['url_route']['kwargs']['session_id']
+        logger.debug(f"text_data = {text_data}, bytes_data = {bytes_data} session_id = {session_id}")
+        # send message to room group
+        if text_data:
+            try:
+                text_data_json = json.loads(text_data)
+                if text_data_json:
+                    logger.debug(f"json data = {text_data_json}")
+                    flag_str, col, row = text_data_json
+                    if flag_str == "onopen":
+                        # 初始化
+                        con = await self.get_connect(2)
+                        code, message = self.telnet_client.connect(
+                            host=con.server, port=int(con.port), username=con.username,
+                            password=AesEncrypt().decrypt(con.password),
+                            session_id=session_id
+                        )
+                        if code != 0:
+                            await self.send(f"\033[1;3;31mCan not connect to server: {message}\033[0m")
+                            await self.disconnect(3000)
+                        else:
+                            await self.channel_layer.group_send(
+                                session_id,
+                                {
+                                    "type": "telnet_message",
+                                    "message": message
+                                }
+                            )
+            except Exception as e:
+                # logger.exception(e)
+                await self.telnet_client.django_to_shell(text_data)
+        if bytes_data:
+            # 字节流发送
+            # self.redis_pubsub.publish(session_id, bytes_data)
+            # await self.send(bytes_data=bytes_data)
+            pass
+
+    async def telnet_message(self, event):
+        message = event["message"]
+        logger.info(f"message = {message}")
         await self.send(text_data=message)
