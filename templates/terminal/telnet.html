@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="{% static 'plugins/fine-uploader/fine-uploader-new.css' %}"/>
     <link rel="stylesheet" href="{% static 'plugins/sweetalert2/sweetalert2.css' %}"/>
     <script src="{% static 'plugins/sweetalert2/sweetalert2.all.js' %}"></script>
+    <script src="{% static 'plugins/html2canvas/html2canvas.min.js' %}"></script>
     <script src="{% static 'js/watermark.js' %}"></script>
 </head>
 <body>
@@ -23,6 +24,26 @@
 <script src="{% static 'js/terminal/custom_telnet.js' %}"></script>
 <script>
     var session_id = "{{ session_id }}";
+
+    function screen_hots() {
+        // 截图指定元素图片
+        html2canvas(document.querySelector("#terminal")).then(canvas => {
+            var imgData = canvas.toDataURL();
+            var saveFile = function (data, filename) {
+                var save_link = document.createElementNS('http://www.w3.org/1999/xhtml', 'a');
+                save_link.href = data;
+                save_link.download = filename;
+
+                var event = document.createEvent('MouseEvents');
+                event.initMouseEvent('click', true, false, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+                save_link.dispatchEvent(event);
+            };
+            //最终文件名+文件格式
+            var filename = 'aaa.png';
+            saveFile(imgData, filename);
+        });
+    }
+
 </script>
 </body>
 </html>
