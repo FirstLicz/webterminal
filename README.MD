@@ -66,7 +66,11 @@ pip install [pyxtermjs](https://pypi.org/project/pyxtermjs/#description)
 ## 使用远程桌面 guacamole
 ### 安装guacamole 插件[pyguacamole](https://pypi.org/project/pyguacamole/)
 > 1. pip install pyguacamole 
-> 2. 
+> 2. docker pull guacamole/guacd
+> 3. docker run -e GUACD_LOG_LEVEL=debug --name some-guacd -p 4822:4822 -d guacamole/guacd
+> 4. docker run --name some-guacamole --link some-guacd:guacd -d -p 8080:8080 guacamole/guacamole
+> 5. docker run --name some-guacamole -e GUACD_HOSTNAME=172.17.42.1 -e GUACD_PORT=4822 -d guacamole/guacamole
+> 
 
 ## django websocket 实现 监听
 > pip install -U [channels](https://channels.readthedocs.io/en/stable/installation.html)
@@ -103,3 +107,6 @@ from pysqlite3 import dbapi2 as Database # 启用pysqlite3
 ```
 
 ## Telnet 协议支持
+
+
+## jqwidgets 插件 方便

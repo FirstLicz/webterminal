@@ -29,5 +29,5 @@ class AesEncrypt:
 
 if __name__ == '__main__':
     aes = AesEncrypt()
-    password = aes.encrypt("bwda123!@#")
+    password = aes.encrypt("1234567")
     print(password)

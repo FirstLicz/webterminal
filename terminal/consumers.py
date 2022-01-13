@@ -99,7 +99,6 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
                                         password=AesEncrypt().decrypt(con.password), port=int(con.port),
                                         timeout=3)
                             channel = ssh.invoke_shell(width=(width // 9), height=(height // 17), term='xterm')
-                            channel.settimeout(0.0)
                         except socket.timeout:
                             await self.send(text_data='\033[1;3;31mConnect to server time out\033[0m')
                             logger.error("Connect to server {0} time out!".format(con.server))
@@ -120,12 +119,12 @@ class AsyncTerminalConsumer(AsyncWebsocketConsumer):
                         if platform.system() == "Linux":
                             write = SubscribeWriteThread(channel=channel, channel_name=self.channel_name,
                                                          room_id=session_id, extra_params=extra_params)
-                            write.setDaemon(True)
+                            # write.setDaemon(True)
                             write.start()
                             extra_params["thread_ssh2_write"] = write
                             display = LinuxInteractiveThread(channel=channel, channel_name=self.channel_name,
                                                              room_id=session_id, extra_params=extra_params)
-                            display.setDaemon(True)
+                            # display.setDaemon(True)
                             display.start()
                         elif platform.system() == "Windows":
                             # shell.windows_shell()

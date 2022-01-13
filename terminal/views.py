@@ -45,6 +45,11 @@ class WebTerminalView(View):
                 "session_id": uuid.uuid1().hex,
                 "server_id": server_id,
             })
+        elif conn.protocol_type == Connections.RDP:
+            return render(request, "terminal/ssh.html", {
+                "session_id": uuid.uuid1().hex,
+                "server_id": server_id,
+            })
         else:
             return Http404("网页不存在")
 

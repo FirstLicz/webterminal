@@ -233,14 +233,14 @@ class LinuxInteractiveThread(InteractiveThread):
         vim_data = ''
         try:
             f.writelines([json.dumps(first_line), '\n'])
-            # self.channel.settimeout(0.0)
+            self.channel.settimeout(0.0)
             data = None
             while self._run_control.isSet():
                 self._control.wait()  # 为True时立即返回，为False时阻塞直到内部设置为True返回
                 try:
                     r, w, e = select.select([self.channel], [], [])
                     if self.channel in r:
-                        logger.info(f"zmodem = {zmodem} zmodemOO = {zmodemOO}")
+                        logger.debug(f"zmodem = {zmodem} zmodemOO = {zmodemOO}")
                         if zmodemOO:
                             zmodemOO = False
                             data = self.channel.recv(2)
@@ -256,8 +256,8 @@ class LinuxInteractiveThread(InteractiveThread):
                                 data = data + self.channel.recv(4096)
                         else:
                             data = self.channel.recv(4096)
-                        logger.info(f"data = {u(data)} active = {self.channel.active}")
-                        if not len(u(data)):
+                        logger.debug(f"data = {u(data)} active = {self.channel.active}")
+                        if len(u(data)) == 0:
                             break
                         if zmodem:
                             if zmodem_rz_end in data or zmodem_sz_end in data:
@@ -275,7 +275,152 @@ class LinuxInteractiveThread(InteractiveThread):
                         else:
                             if zmodem_sz_start in data or zmodem_rz_start in data:
                                 # 单通道发送
-                                logger.info(f"zmodem start")
+                                logger.debug(f"zmodem start")
+                                zmodem = True
+                                async_to_sync(websocket_channel.send)(self.channel_name, {
+                                    "type": "terminal_message",
+                                    "message": data
+                                })
+                                continue
+                            else:
+                                message_data = u(data)
+                                if message_data == "exit\r\n" or message_data == "logout\r\n" or \
+                                        message_data == 'logout':
+                                    self.channel.close()
+                                    break
+                                if message_data == "<<<close>>>":
+                                    self.channel.close()
+                                    ssh.close()
+                                    break
+                                if '\r\n' not in message_data:
+                                    command.append(message_data)
+                                else:
+                                    logger.info(f"command = {command}")
+                                    command_result = CommandDeal().deal_command(''.join(command))
+                                    if len(command_result) != 0:
+                                        # vim command record patch
+                                        logger.info(f"command = {command_result}")
+                                        if command_result.strip().startswith('vi') or \
+                                                command_result.strip().startswith('fg'):
+                                            vim_flag = True
+                                        else:
+                                            if vim_flag:
+                                                if re.compile('\[.*@.*\][\$#]').search(vim_data):
+                                                    vim_flag = False
+                                                    vim_data = ''
+                                            else:
+                                                pass
+                                        command = list()
+                                async_to_sync(websocket_channel.group_send)(self.room_id, {
+                                    "type": "terminal_message",
+                                    "message": message_data
+                                })
+                        # 计算时差、记录内容
+                        delay = round(time.time() - begin_time, 6)
+                        f.writelines([json.dumps([delay, 'o', u(data)]), '\n'])
+                except socket.timeout:
+                    logger.info(f"socket time out")
+                    break
+                except Exception as e:
+                    logger.exception(e)
+                    async_to_sync(websocket_channel.group_send)(self.room_id, {
+                        "type": "terminal_message",
+                        "message": data
+                    })
+        except Exception as e:
+            logger.exception(e)
+        finally:
+            f.close()
+            # cache.delete(self.room_id)
+            # 入口存储 视频记录
+            duration_time = round(time.time() - begin_time)
+            logger.info(f"duration_time = {duration_time}")
+            screen_record.end_time = now()
+            screen_record.duration_second = duration_time
+            screen_record.save()
+            logger.info(f"save screen record complete")
+            # 发送关闭线程命令
+            if thread_ssh2_write.is_alive():
+                thread_ssh2_write.stop()
+            redis_instance = redis.Redis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
+            redis_instance.publish(self.room_id, json.dumps(['close']))
+            logger.info(f"thread ID = {thread_ssh2_write.ident}  is alive = {thread_ssh2_write.is_alive()}")
+
+
+class WindowInteractiveThread(InteractiveThread):
+
+    def run(self) -> None:
+        websocket_channel = get_channel_layer()
+        begin_time = time.time()
+        ssh = self.extra_params['ssh']
+        thread_ssh2_write = self.extra_params.get("thread_ssh2_write", None)
+        # 记录文件日志, 使用version 2 版本，优化 顺序写文件，防止文件过大，吃内存
+        first_line = {
+            "version": 2,
+            "width": self.extra_params.get("width") // 9 - 1,
+            "height": self.extra_params.get("height") // 17 - 1,
+            "timestamp": round(begin_time), "title": "",
+            "env": {
+                "TERM": "xterm-256color", "SHELL": "/bin/bash"
+            }
+        }
+        target_dir = os.path.join(settings.MEDIA_ROOT, "SSH2")
+        if not os.path.isdir(target_dir):
+            os.makedirs(target_dir)
+        # target_file = os.path.join(target_dir, self.channel_name.split(".")[1])   # 默认单通道
+        target_file = os.path.join(target_dir, self.channel_name + "_" + uuid.uuid1().hex)  # 团体通道
+        f = open(target_file, 'w', encoding="utf8")
+        screen_record = ScreenRecord(session=self.room_id, path=target_file, start_time=now(),
+                                     protocol=ScreenRecord.SSH2)
+        command = list()
+        zmodem = False
+        zmodemOO = False
+        vim_flag = False
+        vim_data = ''
+        try:
+            f.writelines([json.dumps(first_line), '\n'])
+            self.channel.settimeout(0.0)
+            data = None
+            while self._run_control.isSet():
+                self._control.wait()  # 为True时立即返回，为False时阻塞直到内部设置为True返回
+                try:
+                    if self.channel:
+                        logger.debug(f"zmodem = {zmodem} zmodemOO = {zmodemOO}")
+                        if zmodemOO:
+                            zmodemOO = False
+                            data = self.channel.recv(2)
+                            if not data:
+                                break
+                            if data == b'OO':
+                                async_to_sync(websocket_channel.send)(self.channel_name, {
+                                    "type": "terminal_message",
+                                    "message": data
+                                })
+                                continue
+                            else:
+                                data = data + self.channel.recv(4096)
+                        else:
+                            data = self.channel.recv(4096)
+                        logger.debug(f"data = {u(data)} active = {self.channel.active}")
+                        if len(u(data)) == 0:
+                            break
+                        if zmodem:
+                            if zmodem_rz_end in data or zmodem_sz_end in data:
+                                logger.info(f"zmodem end")
+                                zmodem = False
+                                if zmodem_sz_end in data:
+                                    zmodemOO = True
+                            if zmodem_cancel in data:
+                                zmodem = False
+                            async_to_sync(websocket_channel.send)(self.channel_name, {
+                                "type": "terminal_message",
+                                "message": data
+                            })
+                            continue
+                        else:
+                            if zmodem_sz_start in data or zmodem_rz_start in data:
+                                # 单通道发送
+                                logger.debug(f"zmodem start")
                                 zmodem = True
                                 async_to_sync(websocket_channel.send)(self.channel_name, {
                                     "type": "terminal_message",
