@@ -1,6 +1,5 @@
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from channels_redis.core import RedisChannelLayer
 import json
 import redis
 
@@ -9,15 +8,12 @@ import logging
 import platform
 from django.conf import settings
 from django.http.request import QueryDict
-from channels.layers import get_channel_layer
-from django.core.cache import cache
 import paramiko
-import telnetlib
 
-from terminal.models import Connections
+from apps.terminal.models import Connections
 from utils.encrypt import AesEncrypt
-from terminal.interactive import LinuxInteractiveThread, SubscribeWriteThread
-from terminal.telnets import TelnetClient
+from apps.terminal.interactive import LinuxInteractiveThread, SubscribeWriteThread
+from apps.terminal.telnets import TelnetClient
 
 __all__ = ["AsyncTerminalConsumer", "AsyncTerminalConsumerMonitor", "AsyncTelnetConsumer"]
 logger = logging.getLogger("default")

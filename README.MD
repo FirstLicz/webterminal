@@ -110,3 +110,20 @@ from pysqlite3 import dbapi2 as Database # 启用pysqlite3
 
 
 ## jqwidgets 插件 方便
+
+
+## 提供rest api
+> pip install djangorestframework  
+> pip install markdown       # Markdown support for the browsable API.  
+> pip install django-filter  # Filtering support  
+> pip install pygments       # pygments是一个将代码格式化的Python库，可以将代码格式化为html代码、图片、rtf文件等多种格式。  
+> pip install djangorestframework-simplejwt # json web 
+> 
+
+
+## 使用celery 处理任务
+> 1.pip install django-celery           # 版本 celery==4.4.7
+> 2.pip install django-celery-results   # 安装存储  
+> 3.pip install eventlet                # windows 组件  
+> 启动命令 celery -A WebTerminal worker -l debug -P eventlet  
+> 

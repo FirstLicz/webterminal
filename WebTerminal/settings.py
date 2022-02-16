@@ -18,7 +18,8 @@ import sys
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 设置环境路径
-sys.path.append(BASE_DIR)
+sys.path.append(Path(BASE_DIR, 'apps').as_posix())
+sys.path.append(BASE_DIR.as_posix())
 
 # build binary file
 GDAL_LIBRARY_PATH = r'C:\OSGeo4W64\bin'
@@ -34,7 +35,6 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -45,8 +45,13 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'channels',
-    'chat',
-    'terminal',
+    'apps.chat',
+    'apps.terminal',
+    'rest_framework',
+    'rest_framework.authtoken',  # 令牌认证
+    'djcelery',  # django-celery
+    'django_celery_results',    # 存储
+
 ]
 
 MIDDLEWARE = [
@@ -57,6 +62,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'apps.common.middleware.CustomMiddleware',
 ]
 
 ROOT_URLCONF = 'WebTerminal.urls'
@@ -86,12 +92,11 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
-        'TEST': {   # test database config
+        'TEST': {  # test database config
             'NAME': BASE_DIR / 'db_test.sqlite3',
         }
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/3.2/ref/settings/#auth-password-validators
@@ -110,7 +115,6 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
-
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.2/topics/i18n/
@@ -192,7 +196,7 @@ LOGGING = {
         },
         'ssh_consumer': {
             'level': 'DEBUG',
-            'class': 'logging.StreamHandler',   # 'logging.FileHandler',
+            'class': 'logging.StreamHandler',  # 'logging.FileHandler',
             'formatter': 'verbose',
             # 'filename': os.path.join(BASE_DIR, 'log', 'sshconsumer.log'),
             # 'encoding': 'utf-8',
@@ -251,3 +255,48 @@ TERMINAL_SESSION_DICT = {}
 
 # 浏览器 iframe
 X_FRAME_OPTIONS = 'SAMEORIGIN'
+
+# restful api
+REST_FRAMEWORK = {
+    # Use Django's standard `django.contrib.auth` permissions,
+    # or allow read-only access for unauthenticated users.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',  #
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10
+}
+
+import datetime
+
+# jwt的配置
+JWT_AUTH = {
+    'JWT_ENCODE_HANDLER': 'rest_framework_jwt.utils.jwt_encode_handler',
+    'JWT_DECODE_HANDLER': 'rest_framework_jwt.utils.jwt_decode_handler',
+    'JWT_PAYLOAD_HANDLER': 'rest_framework_jwt.utils.jwt_payload_handler',
+    # 将payload丢到jwt_get_user_id_from_payload_handler中会的到一个userid
+    'JWT_PAYLOAD_GET_USER_ID_HANDLER':
+        'rest_framework_jwt.utils.jwt_get_user_id_from_payload_handler',
+    # 可以配置非对称加密
+    'JWT_PRIVATE_KEY': None,
+    'JWT_PUBLIC_KEY': None,
+    # 默认的key
+    'JWT_SECRET_KEY': SECRET_KEY,
+    # 过期时间默认为seconds=300
+    'JWT_EXPIRATION_DELTA': datetime.timedelta(days=7),  # 过期时间，手动配置
+    'JWT_AUTH_HEADER_PREFIX': 'JWT',
+    # 刷新过期时间
+    'JWT_ALLOW_REFRESH': False,
+    'JWT_REFRESH_EXPIRATION_DELTA': datetime.timedelta(days=7),
+}
+
+# Celery Configuration Options
+CELERY_BROKER_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/1'  # Broker配置，使用Redis作为消息中间件
+CELERY_RESULT_BACKEND = f'redis://{REDIS_HOST}:{REDIS_PORT}/2'  # BACKEND配置，这里使用redis
+BROKER_URL = CELERY_RESULT_BACKEND  # transport url
+# CELERY_ACCEPT_CONTENT = ['pickle', 'json', 'msgpack', 'yaml']  # 结果序列化方案

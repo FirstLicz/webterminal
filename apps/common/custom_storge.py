@@ -9,7 +9,7 @@ import os
 import tarfile
 import paramiko
 
-from terminal.models import Connections
+from apps.terminal.models import Connections
 
 logger = logging.getLogger("test" if settings.DEBUG else "default")
 

@@ -4,16 +4,12 @@ import socket
 import threading
 import sys
 from paramiko.py3compat import u
-from datetime import datetime, timedelta
-from paramiko import SSHClient, SSHException, AutoAddPolicy
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 import os
 from django.conf import settings
-from django.core.cache import cache
 from django.utils.timezone import now
 from paramiko.channel import Channel
-from queue import Queue
 import redis
 import json
 import time
@@ -30,7 +26,7 @@ except ImportError:
     pass
 
 from utils.commandDeal import CommandDeal
-from terminal.models import ScreenRecord
+from apps.terminal.models import ScreenRecord
 
 logger = logging.getLogger("default")
 zmodem_sz_start = b'rz\r**\x18B00000000000000\r\x8a'

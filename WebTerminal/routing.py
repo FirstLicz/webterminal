@@ -1,7 +1,7 @@
 from django.urls import re_path
 
-from chat.consumers import ChatAsyncConsumer
-from terminal.consumers import AsyncTerminalConsumer, AsyncTerminalConsumerMonitor, AsyncTelnetConsumer
+from apps.chat.consumers import ChatAsyncConsumer
+from apps.terminal.consumers import AsyncTerminalConsumer, AsyncTerminalConsumerMonitor, AsyncTelnetConsumer
 
 websocket_urlpatterns = [
     re_path(r"ws/chat/(?P<room_name>\w+)/$", ChatAsyncConsumer.as_asgi()),

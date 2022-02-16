@@ -17,12 +17,19 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from rest_framework import routers
+from rest_framework.authtoken import views
+from rest_framework_jwt.views import obtain_jwt_token, refresh_jwt_token, verify_jwt_token
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('chat/', include("chat.urls")),
-    path('terminal/', include("terminal.urls")),
-
+    path('chat/', include("apps.chat.urls")),
+    path('users/', include("apps.users.urls")),
+    path('terminal/', include("apps.terminal.urls")),
+    path('api-auth/', include('rest_framework.urls')),
+    path('api-token-auth/', obtain_jwt_token),
+    path('api-token-refresh/', refresh_jwt_token),
+    path('api-token-verify/', verify_jwt_token),
 ]
 if settings.DEBUG:
     # static url 配置

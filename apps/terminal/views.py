@@ -1,10 +1,7 @@
 from django.shortcuts import render
 from django.views.generic import View
-from django.http.response import JsonResponse, FileResponse, StreamingHttpResponse, Http404
+from django.http.response import JsonResponse, Http404
 from django.conf import settings
-from django.utils.encoding import escape_uri_path
-from wsgiref.util import FileWrapper
-from django.core.cache import cache
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
@@ -12,12 +9,11 @@ from pathlib import Path
 import uuid
 import logging
 import io
-import tempfile
 import os
 
-from common.custom_storge import SFTPStorage
-from common.utils import SFTPFileResponse, StreamingFileResponse
-from terminal.models import Connections, ScreenRecord
+from apps.common.custom_storge import SFTPStorage
+from apps.common.utils import SFTPFileResponse, StreamingFileResponse
+from apps.terminal.models import Connections, ScreenRecord
 
 logger = logging.getLogger("test" if settings.DEBUG else "default")
 
